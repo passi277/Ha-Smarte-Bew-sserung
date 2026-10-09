@@ -35,7 +35,6 @@ class ZoneEntity(CoordinatorEntity[SmarteBewaesserungCoordinator]):
 
     def __init__(self, coordinator: SmarteBewaesserungCoordinator, subentry_id: str, key: str) -> None:
         super().__init__(coordinator)
-        entry = coordinator.config_entry
         zone = coordinator.zones[subentry_id]
         self.subentry_id = subentry_id
         self._attr_translation_key = key
@@ -45,7 +44,6 @@ class ZoneEntity(CoordinatorEntity[SmarteBewaesserungCoordinator]):
             name=zone.name,
             manufacturer="Smarte Bewässerung",
             model="Zone",
-            via_device=(DOMAIN, entry.entry_id),
             entry_type=DeviceEntryType.SERVICE,
         )
 

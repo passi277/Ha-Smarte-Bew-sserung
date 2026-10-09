@@ -130,7 +130,6 @@ ZONE_SENSORS: tuple[ZoneSensorDescription, ...] = (
     ),
     ZoneSensorDescription(
         key="water_demand",
-        device_class=SensorDeviceClass.VOLUME,
         native_unit_of_measurement=UnitOfVolume.LITERS,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
@@ -180,7 +179,6 @@ ZONE_SENSORS: tuple[ZoneSensorDescription, ...] = (
     ),
     ZoneSensorDescription(
         key="current_run_volume",
-        device_class=SensorDeviceClass.VOLUME,
         native_unit_of_measurement=UnitOfVolume.LITERS,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
@@ -209,7 +207,6 @@ ZONE_SENSORS: tuple[ZoneSensorDescription, ...] = (
     ),
     ZoneSensorDescription(
         key="recommended_volume",
-        device_class=SensorDeviceClass.VOLUME,
         native_unit_of_measurement=UnitOfVolume.LITERS,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda z: z.recommendation.liters,
