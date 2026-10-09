@@ -127,3 +127,48 @@ def test_seasonal_kc() -> None:
     assert seasonal_kc("custom", date(2026, 7, 15), 0.7) == 0.7
     assert phase("banana", date(2026, 12, 1)) == "dormant"
     assert phase("custom", date(2026, 12, 1)) is None
+
+
+def test_grassland_temperature_sum() -> None:
+    from datetime import date, timedelta
+
+    from custom_components.smarte_bewaesserung.plants import grassland_temperature_sum
+
+    means = {date(2026, 1, 1) + timedelta(days=i): 4.0 for i in range(70)}
+    means[date(2026, 1, 5)] = -3.0  # Frosttage zählen 0
+    # Januar: 30 Tage × 4 × 0,5 = 60; Februar: 28 × 4 × 0,75 = 84; März 1.–10.: 10 × 4 = 40
+    assert grassland_temperature_sum(means, date(2026, 3, 11)) == pytest.approx(184.0)
+    # Lücken über 3 Tage → unbekannt
+    assert grassland_temperature_sum(means, date(2026, 4, 30)) is None
+
+
+def test_weather_overrides_calendar() -> None:
+    from datetime import date, timedelta
+
+    from custom_components.smarte_bewaesserung.plants import adjust_for_weather, weather_dormant
+
+    # Milder Winter: GTS 200 schon am 25. Februar erreicht → Rasen treibt aus, obwohl Kalender „Ruhe“ sagt
+    warm = {date(2026, 1, 1) + timedelta(days=i): 6.0 for i in range(60)}
+    day = date(2026, 2, 25)
+    assert weather_dormant("lawn", warm, day) is False
+    kc, phase, source = adjust_for_weather("lawn", day, False)
+    assert (phase, source) == ("sprouting", "weather")
+    assert kc == pytest.approx(0.75)
+    # Bananen brauchen GTS 500 → ruhen noch
+    assert weather_dormant("banana", warm, day) is True
+    kc, phase, _ = adjust_for_weather("banana", day, True)
+    assert (kc, phase) == (0.2, "dormant")
+
+    # Herbst: fünf Tage unter 10 °C beenden die Bananen-Saison, Rasen (5 °C) wächst weiter
+    autumn = {date(2026, 8, 1) + timedelta(days=i): 15.0 for i in range(70)}
+    for i in range(5):
+        autumn[date(2026, 10, 1) + timedelta(days=i)] = 8.0
+    day = date(2026, 10, 9)
+    assert weather_dormant("banana", autumn, day) is True
+    assert weather_dormant("lawn", autumn, day) is False
+    # Warmer November: Rasen reift noch ab statt Winterruhe
+    kc, phase, _ = adjust_for_weather("lawn", date(2026, 11, 20), False)
+    assert phase == "ripening"
+    assert kc == pytest.approx(0.72)
+    # Ohne Daten gilt der Kalender
+    assert adjust_for_weather("lawn", date(2026, 11, 20), None)[1:] == ("dormant", "calendar")

@@ -83,6 +83,34 @@ Quellen:
   Bananen ruhen von November bis März.
 - **Sträucher, Stauden:** WUCOLS, Stufe „mittlerer Bedarf“.
 
+### Saisonphasen nach dem echten Wetter
+
+Der Kalender ist nur der Ausgangspunkt. Die Integration verschiebt Saisonbeginn und Saisonende nach dem
+tatsächlichen Wetter:
+
+- **Frühjahr:** Eine Pflanze treibt aus, sobald die **Grünlandtemperatursumme (GTS)** ihren Schwellwert
+  erreicht. Die GTS ist die Summe der positiven Tagesmitteltemperaturen ab 1. Januar, wobei der Januar mit
+  × 0,5 und der Februar mit × 0,75 zählt. GTS 200 gilt beim Deutschen Wetterdienst als Vegetationsbeginn für
+  Grünland.
+- **Herbst:** Die Winterruhe beginnt nach **5 Tagen in Folge** (ab August), an denen das Tagesmittel unter der
+  Ruhetemperatur der Pflanze liegt.
+
+| Pflanze | Austrieb ab GTS | Winterruhe unter |
+|---|---|---|
+| Rasen, Sportrasen, Stauden, Sträucher, Beeren | 200 | 5 °C |
+| Obstbäume | 250 | 5 °C |
+| Gemüsebeet | 300 | 8 °C |
+| Bananen | 500 | 10 °C |
+
+Folgen für die Rechnung:
+- Ruht die Pflanze laut Wetter, gilt ihr Ruhe-Kc.
+- Wächst sie früher oder länger, als der Kalender vorsieht, gilt die Phase „Austrieb“ bzw. „Abreife“ mit dem
+  Kc des angrenzenden aktiven Monats.
+- Die Tagesmittel kommen aus dem Open-Meteo-Archiv (einmal täglich ab 1. Januar nachgeladen) und aus der
+  Vorhersage.
+- Fehlen Daten, gilt der Kalender. Das Attribut `source` der Saisonphase zeigt, ob gerade das Wetter oder der
+  Kalender entscheidet.
+
 Wer keine dieser Pflanzen hat, wählt **„Eigener fester Kc“** und trägt einen festen Pflanzenfaktor ein.
 
 ### Vorschlag für die drei Zonen
@@ -102,7 +130,7 @@ eingestellten Durchsatz.
 
 ## Entities
 
-**Gerät „Smarte Bewässerung“:** ET₀ heute/gestern, Regen heute/gestern (mit Quelle), Regenvorhersage 24 h,
+**Gerät „Smarte Bewässerung“:** Grünlandtemperatursumme, ET₀ heute/gestern, Regen heute/gestern (mit Quelle), Regenvorhersage 24 h,
 Tiefsttemperatur 24 h, Frostgefahr, Regensperre.
 
 **Je Zone:**

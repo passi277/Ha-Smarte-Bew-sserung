@@ -52,6 +52,13 @@ class ZoneSensorDescription(SensorEntityDescription):
 
 GLOBAL_SENSORS: tuple[GlobalSensorDescription, ...] = (
     GlobalSensorDescription(
+        key="gts",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=lambda s: s.gts,
+    ),
+    GlobalSensorDescription(
         key="et0_so_far",
         native_unit_of_measurement=MM,
         state_class=SensorStateClass.MEASUREMENT,
@@ -176,6 +183,7 @@ ZONE_SENSORS: tuple[ZoneSensorDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=PHASES,
         value_fn=lambda z: z.phase,
+        attrs_fn=lambda z: {"source": z.phase_source, "spring_gts_threshold": z.spring_gts},
     ),
     ZoneSensorDescription(
         key="current_run_volume",

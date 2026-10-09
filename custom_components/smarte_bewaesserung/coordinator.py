@@ -63,11 +63,12 @@ from .const import (
     UPDATE_INTERVAL,
 )
 from .irrigation_tracker import INVALID_STATES, IrrigationTracker, RunRecord, read_float
-from .open_meteo import OpenMeteoError, WeatherData, async_fetch
+from .open_meteo import OpenMeteoError, WeatherData, async_fetch, async_fetch_daily_means
 
 _LOGGER = logging.getLogger(__name__)
 
 RATE_UNITS = ("mm/h", "in/h", "mm/d")
+ARCHIVE_DELAY_DAYS = 6
 DURATION_UNITS = {"s": 1 / 60, "min": 1.0, "h": 60.0}
 
 
@@ -84,6 +85,8 @@ class ZoneSnapshot:
     plant: str
     kc: float
     phase: str | None
+    phase_source: str
+    spring_gts: float | None
     etc_so_far_mm: float
     etc_today_mm: float
     etc_tomorrow_mm: float | None
@@ -118,6 +121,7 @@ class Snapshot:
     raining_now: bool = False
     frost: bool = False
     last_closed: date | None = None
+    gts: float | None = None
     weather_updated: datetime | None = None
     zones: dict[str, ZoneSnapshot] = field(default_factory=dict)
 
@@ -152,13 +156,21 @@ class Zone:
         state.setdefault("history", [])
         state.setdefault("irrigation_mm_by_date", {})
         self.tracker: IrrigationTracker | None = None
+        # Tagesmitteltemperaturen, vom Coordinator geteilt und laufend ergänzt.
+        self.daily_means: dict[date, float] = {}
+
+    def season(self, day: date) -> tuple[float, str | None, str]:
+        """(Kc, Phase, Quelle) des Tages nach Jahreszeit und tatsächlichem Wetter."""
+        if self.plant == plants.PLANT_CUSTOM:
+            return self.params.kc, None, plants.SOURCE_CALENDAR
+        dormant = plants.weather_dormant(self.plant, self.daily_means, day)
+        kc, phase, source = plants.adjust_for_weather(self.plant, day, dormant)
+        factor = float(self.data.get(CONF_KC_FACTOR, 1.0))
+        return round(kc * factor, 3), phase, source
 
     def kc_for(self, day: date) -> float:
-        """Pflanzenfaktor des Tages nach Jahreszeit."""
-        if self.plant == plants.PLANT_CUSTOM:
-            return self.params.kc
-        factor = float(self.data.get(CONF_KC_FACTOR, 1.0))
-        return round(plants.seasonal_kc(self.plant, day) * factor, 3)
+        """Pflanzenfaktor des Tages."""
+        return self.season(day)[0]
 
     def params_for(self, day: date) -> model.ZoneParams:
         """Zonenparameter mit dem Pflanzenfaktor des Tages."""
@@ -209,6 +221,7 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
         self.zones: dict[str, Zone] = {}
         self._unsubs: list[CALLBACK_TYPE] = []
         self._rain_last: float | None = None
+        self._means: dict[date, float] = {}
         self._debouncer = Debouncer(
             hass, _LOGGER, cooldown=REFRESH_COOLDOWN_SECONDS, immediate=True, function=self.refresh_now
         )
@@ -240,6 +253,8 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
         self._stored = await self._store.async_load() or {}
         self._stored.setdefault("zones", {})
         self._stored.setdefault("rain_by_date", {})
+        self._stored.setdefault("daily_temps", {})
+        self._means.update({date.fromisoformat(k): float(v) for k, v in self._stored["daily_temps"].items()})
         if "last_closed" not in self._stored:
             # Neu eingerichtet: nicht rückwirkend rechnen, ab heute bilanzieren.
             self._stored["last_closed"] = (dt_util.now().date() - timedelta(days=1)).isoformat()
@@ -249,6 +264,7 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
                 continue
             state = self._stored["zones"].setdefault(subentry.subentry_id, {})
             zone = Zone(subentry, state)
+            zone.daily_means = self._means
             self.zones[subentry.subentry_id] = zone
             valve = zone.data.get(CONF_VALVE)
             flow = zone.data.get(CONF_FLOW_SENSOR)
@@ -370,11 +386,56 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
                 raise UpdateFailed(str(err)) from err
             _LOGGER.warning("%s – rechne mit den letzten Wetterdaten weiter", err)
 
+        self._store_daily_means()
+        await self._backfill_daily_means()
         self._mark_rain_sensor_day()
         self._close_days()
         self._prune()
         self._save()
         return self._build_snapshot()
+
+    def _store_daily_means(self) -> None:
+        """Tagesmittel abgeschlossener Tage aus der Vorhersage-Antwort übernehmen."""
+        assert self.weather is not None
+        today = dt_util.now().date()
+        for day, weather in self.weather.daily.items():
+            if day < today and weather.temp_mean_c is not None:
+                self._set_mean(day, weather.temp_mean_c)
+
+    def _set_mean(self, day: date, mean: float) -> None:
+        self._means[day] = mean
+        self._stored["daily_temps"][day.isoformat()] = round(mean, 2)
+
+    async def _backfill_daily_means(self) -> None:
+        """Fehlende Tagesmittel seit 1. Januar einmal am Tag aus dem Archiv holen."""
+        today = dt_util.now().date()
+        if self._stored.get("temps_backfilled") == today.isoformat():
+            return
+        # Das Archiv hat einige Tage Verzug; die letzten Tage kommen aus der Vorhersage.
+        end = today - timedelta(days=ARCHIVE_DELAY_DAYS)
+        missing = [
+            d
+            for d in (
+                date(today.year, 1, 1) + timedelta(days=i) for i in range((end - date(today.year, 1, 1)).days + 1)
+            )
+            if d not in self._means
+        ]
+        if missing:
+            try:
+                means = await async_fetch_daily_means(
+                    async_get_clientsession(self.hass),
+                    self.hass.config.latitude,
+                    self.hass.config.longitude,
+                    self.hass.config.time_zone,
+                    min(missing),
+                    max(missing),
+                )
+            except OpenMeteoError as err:
+                _LOGGER.warning("%s – Saisonphasen richten sich vorerst nach dem Kalender", err)
+                return
+            for day, mean in means.items():
+                self._set_mean(day, mean)
+        self._stored["temps_backfilled"] = today.isoformat()
 
     def _close_days(self) -> None:
         """Alle vollständig vergangenen, noch offenen Tage bilanzieren."""
@@ -419,6 +480,11 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
 
     def _prune(self) -> None:
         cutoff = (dt_util.now().date() - timedelta(days=HISTORY_DAYS)).isoformat()
+        # Temperaturen werden nur für das laufende Jahr gebraucht (GTS ab 1. Januar, Herbst ab August).
+        year_start = date(dt_util.now().year, 1, 1)
+        for day in [d for d in self._means if d < year_start]:
+            del self._means[day]
+            self._stored["daily_temps"].pop(day.isoformat(), None)
         rain = self._stored["rain_by_date"]
         for key in [k for k in rain if k < cutoff]:
             del rain[key]
@@ -607,10 +673,12 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
             raining_now=conditions.raining_now,
             frost=conditions.min_temp_24h_c is not None and conditions.min_temp_24h_c < thresholds.frost_c,
             last_closed=date.fromisoformat(self._stored["last_closed"]),
+            gts=plants.grassland_temperature_sum(self._means, today),
             weather_updated=self.weather_updated,
         )
         for sub_id, zone in self.zones.items():
-            params = zone.params_for(today)
+            kc, phase, phase_source = zone.season(today)
+            params = replace(zone.params, kc=kc)
             etc_so_far, eff_rain_so_far = self._today_so_far(zone)
             tracker = zone.tracker
             running = bool(tracker and tracker.running)
@@ -634,7 +702,9 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
                 raw_mm=round(params.raw_mm, 1),
                 plant=zone.plant,
                 kc=params.kc,
-                phase=plants.phase(zone.plant, today),
+                phase=phase,
+                phase_source=phase_source,
+                spring_gts=plants.PLANTS[zone.plant].spring_gts if zone.plant in plants.PLANTS else None,
                 etc_so_far_mm=round(etc_so_far, 2),
                 etc_today_mm=round((et0_so_far + et0_rest_of_day) * params.kc, 2),
                 etc_tomorrow_mm=round(tomorrow_totals[0] * zone.kc_for(tomorrow), 2) if tomorrow_totals else None,

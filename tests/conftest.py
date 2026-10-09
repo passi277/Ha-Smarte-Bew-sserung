@@ -48,3 +48,10 @@ def mock_fetch():
     """Open-Meteo-Abruf ersetzen; Rückgabewert über mock_fetch.return_value setzen."""
     with patch("custom_components.smarte_bewaesserung.coordinator.async_fetch") as mock:
         yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_daily_means():
+    """Archivabruf der Tagesmittel ersetzen (Standard: keine Daten → Kalender)."""
+    with patch("custom_components.smarte_bewaesserung.coordinator.async_fetch_daily_means", return_value={}) as mock:
+        yield mock

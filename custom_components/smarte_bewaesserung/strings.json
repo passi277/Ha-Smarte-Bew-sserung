@@ -192,6 +192,9 @@
       "et0_so_far": {
         "name": "ET₀ so far today"
       },
+      "gts": {
+        "name": "Grassland temperature sum"
+      },
       "water_demand": {
         "name": "Water demand"
       },
@@ -266,6 +269,18 @@
           "growth": "Growth",
           "peak": "Peak season",
           "ripening": "Ripening"
+        },
+        "state_attributes": {
+          "source": {
+            "name": "Basis",
+            "state": {
+              "weather": "Weather",
+              "calendar": "Calendar"
+            }
+          },
+          "spring_gts_threshold": {
+            "name": "Sprouting at GTS"
+          }
         }
       }
     },

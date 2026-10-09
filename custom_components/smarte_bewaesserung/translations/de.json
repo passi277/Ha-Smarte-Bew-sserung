@@ -192,6 +192,9 @@
       "et0_so_far": {
         "name": "ET₀ bisher heute"
       },
+      "gts": {
+        "name": "Grünlandtemperatursumme"
+      },
       "water_demand": {
         "name": "Wasserbedarf"
       },
@@ -266,6 +269,18 @@
           "growth": "Wachstum",
           "peak": "Hauptsaison",
           "ripening": "Abreife"
+        },
+        "state_attributes": {
+          "source": {
+            "name": "Grundlage",
+            "state": {
+              "weather": "Wetter",
+              "calendar": "Kalender"
+            }
+          },
+          "spring_gts_threshold": {
+            "name": "Austrieb ab GTS"
+          }
         }
       }
     },

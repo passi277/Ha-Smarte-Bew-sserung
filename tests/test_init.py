@@ -393,3 +393,34 @@ async def test_irrigation_midday_fills_to_field_capacity(
     # set_depletion setzt den aktuellen Wert, auch nachmittags
     await hass.services.async_call(DOMAIN, "set_depletion", {"entity_id": depletion, "depletion_mm": 0}, blocking=True)
     assert float(hass.states.get(depletion).state) == 0.0
+
+
+async def test_weather_based_season(
+    hass: HomeAssistant, mock_fetch, mock_daily_means, freezer: FrozenDateTimeFactory
+) -> None:
+    from datetime import date
+
+    # Kalter Oktoberanfang: Bananen gehen nach fünf Tagen unter 10 °C in Winterruhe
+    means = {date(2026, 1, 1) + timedelta(days=i): 12.0 for i in range(280)}
+    for i in range(5):
+        means[date(2026, 10, 1) + timedelta(days=i)] = 7.0
+    mock_daily_means.return_value = means
+    zone = {
+        **{k: v for k, v in LAWN_FLOW.items() if k not in (CONF_VALVE, CONF_FLOW_SENSOR)},
+        "name": "Bananen",
+        CONF_PLANT: "banana",
+        CONF_AREA: 15,
+    }
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    freezer.move_to("2026-10-09 10:00:00+02:00")
+    mock_fetch.return_value = make_weather(dt_util.now().date(), et0=1.0)
+    entry = _entry(zone=zone)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    phase = hass.states.get(_eid(hass, "sensor", "season_phase"))
+    assert phase.state == "dormant"
+    assert phase.attributes["source"] == "weather"
+    assert float(hass.states.get(_eid(hass, "sensor", "kc")).state) == pytest.approx(0.2)
+    assert float(hass.states.get(_eid(hass, "sensor", "gts")).state) > 2000

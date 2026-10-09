@@ -9,6 +9,14 @@ interpoliert. Grundlage:
   Tab. 12, auf die Freiland-Saison in Deutschland gelegt. Bananen im Freien
   ruhen von November bis März (eingepackt oder eingeräumt).
 - Sträucher, Stauden: WUCOLS-Einstufung „mittlerer Wasserbedarf“.
+
+Wetterabhängige Phasen (adjust_for_weather):
+- Frühjahr: Vegetationsbeginn, sobald die Grünlandtemperatursumme (GTS) den
+  Schwellwert der Pflanze erreicht. GTS = Summe der positiven Tagesmittel ab
+  1. Januar, Januar × 0,5, Februar × 0,75, ab März × 1. GTS 200 ist der
+  übliche Vegetationsbeginn für Grünland (Deutscher Wetterdienst).
+- Herbst: Saisonende nach DORMANCY_DAYS Tagen in Folge (ab August) mit
+  Tagesmittel unter der Ruhetemperatur der Pflanze.
 """
 
 from __future__ import annotations
@@ -34,6 +42,10 @@ class PlantProfile:
     root_depth_cm: float
     depletion_fraction: float
     irrigation_type: str
+    # Vegetationsbeginn: Grünlandtemperatursumme (°C), ab der die Pflanze austreibt.
+    spring_gts: float = 200.0
+    # Saisonende: so viele Tage in Folge mit Tagesmittel unter dieser Temperatur.
+    dormancy_temp_c: float = 5.0
 
 
 PLANTS: dict[str, PlantProfile] = {
@@ -60,6 +72,8 @@ PLANTS: dict[str, PlantProfile] = {
         40,
         0.35,
         "drip",
+        spring_gts=500,
+        dormancy_temp_c=10,
     ),
     # Gemüsebeet: FAO-56 Kc ini 0,5 / mid 1,05 / end 0,8.
     "vegetables": PlantProfile(
@@ -68,6 +82,8 @@ PLANTS: dict[str, PlantProfile] = {
         30,
         0.4,
         "drip",
+        spring_gts=300,
+        dormancy_temp_c=8,
     ),
     # Stauden- und Blumenbeete.
     "perennials": PlantProfile(
@@ -92,6 +108,7 @@ PLANTS: dict[str, PlantProfile] = {
         80,
         0.5,
         "drip",
+        spring_gts=250,
     ),
     # Beerensträucher: FAO-56 Kc ini 0,3 / mid 1,05 / end 0,5.
     "berries": PlantProfile(
@@ -135,3 +152,89 @@ def phase(plant: str, day: date) -> str | None:
     """Wachstumsphase des Monats."""
     profile = PLANTS.get(plant)
     return profile.phases[day.month - 1] if profile else None
+
+
+DORMANCY_DAYS = 5
+SOURCE_CALENDAR = "calendar"
+SOURCE_WEATHER = "weather"
+
+
+def gts_weight(month: int) -> float:
+    """Monatsgewicht der Grünlandtemperatursumme."""
+    return {1: 0.5, 2: 0.75}.get(month, 1.0)
+
+
+def grassland_temperature_sum(daily_means: dict[date, float], day: date) -> float | None:
+    """GTS vom 1. Januar bis zum Vortag; None, wenn mehr als 3 Tage fehlen."""
+    total = 0.0
+    missing = 0
+    current = date(day.year, 1, 1)
+    while current < day:
+        mean = daily_means.get(current)
+        if mean is None:
+            missing += 1
+        else:
+            total += max(mean, 0.0) * gts_weight(current.month)
+        current = date.fromordinal(current.toordinal() + 1)
+    if missing > 3:
+        return None
+    return round(total, 1)
+
+
+def weather_dormant(plant: str, daily_means: dict[date, float], day: date) -> bool | None:
+    """Ruht die Pflanze laut Wetter? None, wenn die Daten nicht reichen."""
+    profile = PLANTS.get(plant)
+    if profile is None:
+        return None
+    if day.month <= 7:
+        gts = grassland_temperature_sum(daily_means, day)
+        return None if gts is None else gts < profile.spring_gts
+    # Ab August: einmal DORMANCY_DAYS kalte Tage in Folge → Saisonende bis Jahresende.
+    run = 0
+    current = date(day.year, 8, 1)
+    seen = 0
+    while current < day:
+        mean = daily_means.get(current)
+        if mean is not None:
+            seen += 1
+            run = run + 1 if mean < profile.dormancy_temp_c else 0
+            if run >= DORMANCY_DAYS:
+                return True
+        current = date.fromordinal(current.toordinal() + 1)
+    return False if seen else None
+
+
+def _edge_kc(profile: PlantProfile, spring: bool) -> float:
+    """Kc des ersten (Frühjahr) bzw. letzten (Herbst) aktiven Monats."""
+    months = range(12) if spring else range(11, -1, -1)
+    for i in months:
+        if profile.phases[i] != PHASE_DORMANT:
+            return profile.kc_monthly[i]
+    return min(profile.kc_monthly)
+
+
+def adjust_for_weather(
+    plant: str, day: date, dormant: bool | None, custom_kc: float = 0.8
+) -> tuple[float, str | None, str]:
+    """(Kc, Phase, Quelle) für einen Tag, korrigiert um das tatsächliche Wetter.
+
+    Ohne Wetterdaten gilt der Kalender. Ruht die Pflanze laut Wetter, gilt der
+    Ruhe-Kc; ist sie laut Wetter aktiv, obwohl der Kalender noch/schon Ruhe
+    sagt, gilt Austrieb (Frühjahr) bzw. Abreife (Herbst) mit dem Kc des
+    angrenzenden aktiven Monats.
+    """
+    profile = PLANTS.get(plant)
+    kc = seasonal_kc(plant, day, custom_kc)
+    calendar_phase = phase(plant, day)
+    if profile is None or dormant is None:
+        return kc, calendar_phase, SOURCE_CALENDAR
+    if dormant:
+        return min(profile.kc_monthly), PHASE_DORMANT, SOURCE_WEATHER
+    if calendar_phase == PHASE_DORMANT:
+        spring = day.month <= 7
+        return (
+            max(kc, _edge_kc(profile, spring)),
+            PHASE_SPROUTING if spring else PHASE_RIPENING,
+            SOURCE_WEATHER,
+        )
+    return kc, calendar_phase, SOURCE_WEATHER

@@ -9,6 +9,7 @@ from typing import Any
 import aiohttp
 
 API_URL = "https://api.open-meteo.com/v1/forecast"
+ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 PAST_DAYS = 7
 FORECAST_DAYS = 3
 TIMEOUT = aiohttp.ClientTimeout(total=30)
@@ -26,6 +27,7 @@ class DailyWeather:
     rain_mm: float
     temp_min_c: float | None = None
     temp_max_c: float | None = None
+    temp_mean_c: float | None = None
 
 
 @dataclass(frozen=True)
@@ -124,6 +126,7 @@ def parse_response(payload: dict[str, Any]) -> WeatherData:
                 rain_mm=rain,
                 temp_min_c=_num(daily.get("temperature_2m_min"), i),
                 temp_max_c=_num(daily.get("temperature_2m_max"), i),
+                temp_mean_c=_num(daily.get("temperature_2m_mean"), i),
             )
         for i, ts in enumerate(hourly["time"]):
             data.hourly.append(
@@ -145,7 +148,8 @@ async def async_fetch(session: aiohttp.ClientSession, latitude: float, longitude
     params = {
         "latitude": f"{latitude:.4f}",
         "longitude": f"{longitude:.4f}",
-        "daily": "et0_fao_evapotranspiration,precipitation_sum,temperature_2m_min,temperature_2m_max",
+        "daily": "et0_fao_evapotranspiration,precipitation_sum,"
+        "temperature_2m_min,temperature_2m_max,temperature_2m_mean",
         "hourly": "precipitation,temperature_2m,wind_speed_10m,et0_fao_evapotranspiration",
         "wind_speed_unit": "kmh",
         "past_days": str(PAST_DAYS),
@@ -159,3 +163,34 @@ async def async_fetch(session: aiohttp.ClientSession, latitude: float, longitude
     except (TimeoutError, aiohttp.ClientError) as err:
         raise OpenMeteoError(f"Open-Meteo nicht erreichbar: {err}") from err
     return parse_response(payload)
+
+
+async def async_fetch_daily_means(
+    session: aiohttp.ClientSession,
+    latitude: float,
+    longitude: float,
+    timezone: str,
+    start: date,
+    end: date,
+) -> dict[date, float]:
+    """Tagesmitteltemperaturen aus dem Open-Meteo-Archiv (einige Tage Verzug)."""
+    params = {
+        "latitude": f"{latitude:.4f}",
+        "longitude": f"{longitude:.4f}",
+        "daily": "temperature_2m_mean",
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "timezone": timezone,
+    }
+    try:
+        async with session.get(ARCHIVE_URL, params=params, timeout=TIMEOUT) as resp:
+            resp.raise_for_status()
+            payload = await resp.json()
+        daily = payload["daily"]
+        return {
+            date.fromisoformat(day): float(mean)
+            for day, mean in zip(daily["time"], daily["temperature_2m_mean"], strict=True)
+            if mean is not None
+        }
+    except (TimeoutError, aiohttp.ClientError, KeyError, TypeError, ValueError) as err:
+        raise OpenMeteoError(f"Open-Meteo-Archiv nicht erreichbar: {err}") from err
