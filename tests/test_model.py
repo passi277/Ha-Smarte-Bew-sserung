@@ -109,3 +109,21 @@ def test_recommend_below_minimum() -> None:
     rec = model.recommend(small, small.raw_mm, model.Conditions(), model.Thresholds())
     assert not rec.water
     assert "unter Minimum" in rec.reason
+
+
+def test_seasonal_kc() -> None:
+    from datetime import date
+
+    from custom_components.smarte_bewaesserung.plants import phase, seasonal_kc
+
+    assert seasonal_kc("lawn", date(2026, 4, 15)) == pytest.approx(1.0)
+    assert seasonal_kc("lawn", date(2026, 1, 1)) == pytest.approx(0.6)
+    # 1. März liegt zwischen Februar (0,64) und März (0,75)
+    assert seasonal_kc("lawn", date(2026, 3, 1)) == pytest.approx(0.64 + 0.11 * 14 / 28, abs=0.001)
+    # Frühjahrswachstum braucht mehr als Hochsommer
+    assert seasonal_kc("lawn", date(2026, 4, 20)) > seasonal_kc("lawn", date(2026, 7, 20))
+    assert seasonal_kc("banana", date(2026, 7, 15)) == pytest.approx(1.2)
+    assert seasonal_kc("banana", date(2026, 1, 15)) == pytest.approx(0.2)
+    assert seasonal_kc("custom", date(2026, 7, 15), 0.7) == 0.7
+    assert phase("banana", date(2026, 12, 1)) == "dormant"
+    assert phase("custom", date(2026, 12, 1)) is None

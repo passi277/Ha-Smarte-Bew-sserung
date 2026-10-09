@@ -25,15 +25,19 @@ def make_weather(
     temp: float = 15.0,
     wind: float = 5.0,
 ) -> WeatherData:
-    """Wetter für die letzten 7 Tage und die nächsten 2 Tage."""
+    """Wetter von 7 Tagen zurück bis 3 Tage voraus, gleichmäßig über die Stunden verteilt."""
     data = WeatherData()
-    for offset in range(-7, 2):
+    for offset in range(-7, 3):
         data.daily[today + timedelta(days=offset)] = DailyWeather(et0_mm=et0, rain_mm=rain, temp_min_c=temp)
-    start = datetime.combine(today, datetime.min.time())
-    for hour in range(48):
+    start = datetime.combine(today - timedelta(days=7), datetime.min.time())
+    for hour in range(1, 24 * 10 + 1):
         data.hourly.append(
             HourlyWeather(
-                time=start + timedelta(hours=hour), rain_mm=forecast_rain_per_hour, temp_c=temp, wind_kmh=wind
+                time=start + timedelta(hours=hour),
+                rain_mm=rain / 24 + forecast_rain_per_hour,
+                temp_c=temp,
+                wind_kmh=wind,
+                et0_mm=et0 / 24,
             )
         )
     return data

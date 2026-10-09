@@ -27,8 +27,10 @@ from . import SmarteBewaesserungConfigEntry
 from .const import CONF_COMPARE_ENTITY
 from .coordinator import Snapshot, ZoneSnapshot
 from .entity import GlobalEntity, ZoneEntity
+from .plants import PHASE_DORMANT, PHASE_GROWTH, PHASE_PEAK, PHASE_RIPENING, PHASE_SPROUTING
 
 MM = UnitOfPrecipitationDepth.MILLIMETERS
+PHASES = [PHASE_DORMANT, PHASE_SPROUTING, PHASE_GROWTH, PHASE_PEAK, PHASE_RIPENING]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -49,6 +51,13 @@ class ZoneSensorDescription(SensorEntityDescription):
 
 
 GLOBAL_SENSORS: tuple[GlobalSensorDescription, ...] = (
+    GlobalSensorDescription(
+        key="et0_so_far",
+        native_unit_of_measurement=MM,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda s: s.et0_so_far_mm,
+    ),
     GlobalSensorDescription(
         key="et0_today",
         native_unit_of_measurement=MM,
@@ -111,12 +120,72 @@ ZONE_SENSORS: tuple[ZoneSensorDescription, ...] = (
         suggested_display_precision=1,
         value_fn=lambda z: z.depletion_mm,
         attrs_fn=lambda z: {
+            "depletion_at_day_start_mm": z.committed_depletion_mm,
             "taw_mm": z.taw_mm,
             "raw_mm": z.raw_mm,
             "soil_sensor_depletion_mm": z.sensor_depletion_mm,
             "soil_moisture_pct": z.soil_moisture_pct,
             "history": z.history,
         },
+    ),
+    ZoneSensorDescription(
+        key="water_demand",
+        device_class=SensorDeviceClass.VOLUME,
+        native_unit_of_measurement=UnitOfVolume.LITERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=lambda z: z.demand_liters,
+        attrs_fn=lambda z: {"depletion_mm": z.depletion_mm},
+    ),
+    ZoneSensorDescription(
+        key="etc_so_far",
+        native_unit_of_measurement=MM,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda z: z.etc_so_far_mm,
+    ),
+    ZoneSensorDescription(
+        key="etc_today",
+        native_unit_of_measurement=MM,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda z: z.etc_today_mm,
+    ),
+    ZoneSensorDescription(
+        key="etc_tomorrow",
+        native_unit_of_measurement=MM,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda z: z.etc_tomorrow_mm,
+    ),
+    ZoneSensorDescription(
+        key="etc_7d",
+        native_unit_of_measurement=MM,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda z: z.etc_7d_mm,
+    ),
+    ZoneSensorDescription(
+        key="kc",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda z: z.kc,
+        attrs_fn=lambda z: {"plant": z.plant},
+    ),
+    ZoneSensorDescription(
+        key="season_phase",
+        device_class=SensorDeviceClass.ENUM,
+        options=PHASES,
+        value_fn=lambda z: z.phase,
+    ),
+    ZoneSensorDescription(
+        key="current_run_volume",
+        device_class=SensorDeviceClass.VOLUME,
+        native_unit_of_measurement=UnitOfVolume.LITERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=lambda z: z.live_run_liters,
+        attrs_fn=lambda z: {"flow_lpm": z.current_flow_lpm},
     ),
     ZoneSensorDescription(
         key="soil_water",

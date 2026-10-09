@@ -16,10 +16,12 @@ from custom_components.smarte_bewaesserung.const import (
     CONF_AREA,
     CONF_COMPARE_ENTITY,
     CONF_DEPLETION_FRACTION,
+    CONF_FLOW_SENSOR,
     CONF_IRRIGATION_TYPE,
     CONF_KC,
     CONF_MAX_DURATION,
     CONF_MIN_DURATION,
+    CONF_PLANT,
     CONF_RAIN_SENSOR,
     CONF_ROOT_DEPTH,
     CONF_SOIL_DRY_PCT,
@@ -60,13 +62,14 @@ ZONE_DATA = {
 }
 
 
-def _entry(options: dict | None = None) -> MockConfigEntry:
+def _entry(options: dict | None = None, zone: dict | None = None) -> MockConfigEntry:
+    data = zone or ZONE_DATA
     return MockConfigEntry(
         domain=DOMAIN,
         title="Smarte Bewässerung",
         unique_id=DOMAIN,
         options=options or {},
-        subentries_data=[{"data": ZONE_DATA, "subentry_type": SUBENTRY_ZONE, "title": "Haus", "unique_id": None}],
+        subentries_data=[{"data": data, "subentry_type": SUBENTRY_ZONE, "title": data["name"], "unique_id": None}],
     )
 
 
@@ -82,7 +85,7 @@ def _eid(hass: HomeAssistant, domain: str, key: str) -> str:
 async def setup(hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory):
     """Integration mit einer Zone einrichten."""
     await hass.config.async_set_time_zone("Europe/Berlin")
-    freezer.move_to("2026-07-10 08:00:00+02:00")
+    freezer.move_to("2026-07-10 00:00:00+02:00")
     mock_fetch.return_value = make_weather(dt_util.now().date(), et0=5.0)
     hass.states.async_set(VALVE, "off")
     hass.states.async_set(VOLUME, "0", {"unit_of_measurement": "L"})
@@ -161,7 +164,7 @@ async def test_valve_run_is_tracked(hass: HomeAssistant, setup, freezer: FrozenD
     assert float(last_run.state) == pytest.approx(170)
     assert last_run.attributes["measured"] is True
     # 170 l / 120 m² * 0,75 = 1,0625 mm
-    assert float(hass.states.get(_eid(hass, "sensor", "depletion")).state) == pytest.approx(18.9, abs=0.05)
+    assert float(hass.states.get(_eid(hass, "sensor", "depletion")).state) == pytest.approx(18.95, abs=0.1)
     assert float(hass.states.get(_eid(hass, "sensor", "measured_throughput")).state) == pytest.approx(17.0)
     assert float(hass.states.get(_eid(hass, "sensor", "water_total")).state) == pytest.approx(170)
 
@@ -222,7 +225,7 @@ async def test_services(hass: HomeAssistant, setup) -> None:
 
 async def test_rain_sensor_replaces_open_meteo(hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory) -> None:
     await hass.config.async_set_time_zone("Europe/Berlin")
-    freezer.move_to("2026-07-10 08:00:00+02:00")
+    freezer.move_to("2026-07-10 00:00:00+02:00")
     mock_fetch.return_value = make_weather(dt_util.now().date(), et0=2.0, rain=30.0)
     hass.states.async_set("sensor.regen", "100.0", {"unit_of_measurement": "mm"})
     hass.states.async_set(VALVE, "off")
@@ -249,3 +252,144 @@ async def test_unload(hass: HomeAssistant, setup) -> None:
     assert await hass.config_entries.async_unload(setup.entry_id)
     await hass.async_block_till_done()
     assert setup.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_live_demand_during_the_day(hass: HomeAssistant, setup, freezer: FrozenDateTimeFactory) -> None:
+    freezer.move_to("2026-07-10 12:00:00+02:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    # Halber Tag: ET0 2,5 mm × Kc 0,8 = 2,0 mm
+    assert float(hass.states.get(_eid(hass, "sensor", "depletion")).state) == pytest.approx(2.0)
+    assert float(hass.states.get(_eid(hass, "sensor", "etc_so_far")).state) == pytest.approx(2.0)
+    assert float(hass.states.get(_eid(hass, "sensor", "etc_today")).state) == pytest.approx(4.0)
+    assert float(hass.states.get(_eid(hass, "sensor", "etc_tomorrow")).state) == pytest.approx(4.0)
+    # 2 mm auf 120 m² mit 75 % Wirkungsgrad → 320 l
+    assert float(hass.states.get(_eid(hass, "sensor", "water_demand")).state) == pytest.approx(320)
+    assert float(hass.states.get(_eid(hass, "sensor", "et0_so_far")).state) == pytest.approx(2.5)
+
+    # Um Mitternacht wird der Tag mit dem vollen Tageswert abgeschlossen
+    freezer.move_to("2026-07-11 00:05:00+02:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    depletion = hass.states.get(_eid(hass, "sensor", "depletion"))
+    assert float(depletion.state) == pytest.approx(4.0, abs=0.05)
+    assert depletion.attributes["depletion_at_day_start_mm"] == pytest.approx(4.0)
+
+
+LAWN_FLOW = {
+    "name": "Volleyball",
+    CONF_PLANT: "lawn",
+    CONF_AREA: 200,
+    CONF_THROUGHPUT: 23,
+    CONF_IRRIGATION_TYPE: "sprinkler",
+    CONF_SOIL_TYPE: "loam",
+    CONF_MIN_DURATION: 3,
+    CONF_MAX_DURATION: 30,
+    CONF_VALVE: "switch.ventil_volleyball",
+    CONF_FLOW_SENSOR: "sensor.ventil_volleyball_flow",
+}
+
+
+async def _setup_zone(hass: HomeAssistant, mock_fetch, freezer, zone: dict) -> MockConfigEntry:
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    freezer.move_to("2026-07-10 00:00:00+02:00")
+    mock_fetch.return_value = make_weather(dt_util.now().date(), et0=5.0)
+    hass.states.async_set("switch.ventil_volleyball", "off")
+    hass.states.async_set("sensor.ventil_volleyball_flow", "0", {"unit_of_measurement": "m³/h"})
+    entry = _entry(zone=zone)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+async def test_seasonal_plant_profile(hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory) -> None:
+    await _setup_zone(hass, mock_fetch, freezer, LAWN_FLOW)
+    # 10. Juli: zwischen Juni (0,88) und Juli (0,85)
+    kc = hass.states.get(_eid(hass, "sensor", "kc"))
+    assert float(kc.state) == pytest.approx(0.855, abs=0.001)
+    assert kc.attributes["plant"] == "lawn"
+    assert hass.states.get(_eid(hass, "sensor", "season_phase")).state == "peak"
+    depletion = hass.states.get(_eid(hass, "sensor", "depletion"))
+    # Rasenprofil: 20 cm Lehm → TAW 30 mm, p 0,5
+    assert depletion.attributes["taw_mm"] == 30.0
+
+
+async def test_flow_sensor_measures_run(hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory) -> None:
+    await _setup_zone(hass, mock_fetch, freezer, LAWN_FLOW)
+    flow = "sensor.ventil_volleyball_flow"
+
+    hass.states.async_set("switch.ventil_volleyball", "on")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(seconds=2))
+    hass.states.async_set(flow, "1.38", {"unit_of_measurement": "m³/h"})  # 23 l/min
+    await hass.async_block_till_done()
+
+    freezer.tick(timedelta(minutes=5))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    current = hass.states.get(_eid(hass, "sensor", "current_run_volume"))
+    assert float(current.state) == pytest.approx(115, abs=1)
+    assert current.attributes["flow_lpm"] == pytest.approx(23.0)
+
+    freezer.tick(timedelta(minutes=5))
+    hass.states.async_set("switch.ventil_volleyball", "off")
+    hass.states.async_set(flow, "0", {"unit_of_measurement": "m³/h"})
+    await hass.async_block_till_done()
+
+    last_run = hass.states.get(_eid(hass, "sensor", "last_run_volume"))
+    assert float(last_run.state) == pytest.approx(230, abs=1)
+    assert last_run.attributes["source"] == "flow"
+    assert float(hass.states.get(_eid(hass, "sensor", "current_run_volume")).state) == 0
+
+
+async def test_valve_open_without_flow(hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory) -> None:
+    await _setup_zone(hass, mock_fetch, freezer, LAWN_FLOW)
+    hass.states.async_set("switch.ventil_volleyball", "on")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=3))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    hass.states.async_set("switch.ventil_volleyball", "off")
+    await hass.async_block_till_done()
+    problem = hass.states.get(_eid(hass, "binary_sensor", "problem"))
+    assert problem.state == "on"
+    assert any("kein Durchfluss" in f for f in problem.attributes["faults"])
+
+
+async def test_flow_only_zone(hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory) -> None:
+    zone = {k: v for k, v in LAWN_FLOW.items() if k != CONF_VALVE}
+    await _setup_zone(hass, mock_fetch, freezer, zone)
+    flow = "sensor.ventil_volleyball_flow"
+    hass.states.async_set(flow, "1.2", {"unit_of_measurement": "m³/h"})  # 20 l/min
+    await hass.async_block_till_done()
+    assert hass.states.get(_eid(hass, "binary_sensor", "watering")).state == "on"
+    freezer.tick(timedelta(minutes=6))
+    hass.states.async_set(flow, "0", {"unit_of_measurement": "m³/h"})
+    await hass.async_block_till_done()
+    last_run = hass.states.get(_eid(hass, "sensor", "last_run_volume"))
+    assert float(last_run.state) == pytest.approx(120, abs=1)
+
+
+async def test_irrigation_midday_fills_to_field_capacity(
+    hass: HomeAssistant, setup, freezer: FrozenDateTimeFactory
+) -> None:
+    depletion = _eid(hass, "sensor", "depletion")
+    freezer.move_to("2026-07-10 12:00:00+02:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert float(hass.states.get(depletion).state) == pytest.approx(2.0)
+
+    # Mehr Wasser als nötig: Boden ist danach voll, Überschuss versickert
+    await hass.services.async_call(DOMAIN, "record_irrigation", {"entity_id": depletion, "liters": 1000}, blocking=True)
+    assert float(hass.states.get(depletion).state) == 0.0
+
+    # Nachmittags läuft der Verbrauch weiter
+    freezer.move_to("2026-07-10 18:00:00+02:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert float(hass.states.get(depletion).state) == pytest.approx(1.0)
+
+    # set_depletion setzt den aktuellen Wert, auch nachmittags
+    await hass.services.async_call(DOMAIN, "set_depletion", {"entity_id": depletion, "depletion_mm": 0}, blocking=True)
+    assert float(hass.states.get(depletion).state) == 0.0

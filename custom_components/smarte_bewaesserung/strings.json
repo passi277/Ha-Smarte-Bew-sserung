@@ -50,6 +50,22 @@
           "title": "New zone",
           "data": {
             "name": "Name",
+            "plant": "What is irrigated?",
+            "area_m2": "Area",
+            "throughput_lpm": "Throughput"
+          },
+          "data_description": {
+            "plant": "Sets the seasonal water demand (monthly crop coefficient), root depth and watering threshold.",
+            "throughput_lpm": "Liters per minute with open valve."
+          }
+        },
+        "details": {
+          "title": "Zone details",
+          "description": "Suggestions come from the plant profile. Seasonal crop coefficient: {kc_curve}",
+          "data": {
+            "name": "Name",
+            "plant": "Plant",
+            "kc_factor": "Demand adjustment (1.0 = default)",
             "area_m2": "Area",
             "throughput_lpm": "Throughput",
             "irrigation_type": "Irrigation type",
@@ -68,6 +84,8 @@
             "compare_entity": "Compare with (e.g. Smart Irrigation duration)"
           },
           "data_description": {
+            "kc_factor": "Scales the seasonal curve: shade 0.8 · full sun 1.1 · newly planted 1.2",
+            "flow_sensor": "Valve flow rate (e.g. m³/h). Liters per run are integrated from it.",
             "kc": "Lawn 0.8 · vegetables 1.0 · banana 1.1–1.2 · shrubs 0.5",
             "root_depth_cm": "Lawn 15–20 cm · vegetables 30 cm · banana 40–60 cm",
             "depletion_fraction": "Lawn 0.5 · sensitive plants 0.35",
@@ -79,6 +97,22 @@
           "title": "Edit zone",
           "data": {
             "name": "Name",
+            "plant": "What is irrigated?",
+            "area_m2": "Area",
+            "throughput_lpm": "Throughput"
+          },
+          "data_description": {
+            "plant": "Sets the seasonal water demand (monthly crop coefficient), root depth and watering threshold.",
+            "throughput_lpm": "Liters per minute with open valve."
+          }
+        },
+        "reconfigure_details": {
+          "title": "Zone details",
+          "description": "Suggestions come from the plant profile. Seasonal crop coefficient: {kc_curve}",
+          "data": {
+            "name": "Name",
+            "plant": "Plant",
+            "kc_factor": "Demand adjustment (1.0 = default)",
             "area_m2": "Area",
             "throughput_lpm": "Throughput",
             "irrigation_type": "Irrigation type",
@@ -97,6 +131,8 @@
             "compare_entity": "Compare with (e.g. Smart Irrigation duration)"
           },
           "data_description": {
+            "kc_factor": "Scales the seasonal curve: shade 0.8 · full sun 1.1 · newly planted 1.2",
+            "flow_sensor": "Valve flow rate (e.g. m³/h). Liters per run are integrated from it.",
             "kc": "Lawn 0.8 · vegetables 1.0 · banana 1.1–1.2 · shrubs 0.5",
             "root_depth_cm": "Lawn 15–20 cm · vegetables 30 cm · banana 40–60 cm",
             "depletion_fraction": "Lawn 0.5 · sensitive plants 0.35",
@@ -125,6 +161,19 @@
         "clay": "Clay"
       }
     },
+    "plant": {
+      "options": {
+        "lawn": "Lawn",
+        "sports_lawn": "Sports lawn",
+        "banana": "Bananas",
+        "vegetables": "Vegetable bed",
+        "perennials": "Perennials/flower bed",
+        "shrubs": "Shrubs/hedge",
+        "fruit_trees": "Fruit trees",
+        "berries": "Berry bushes",
+        "custom": "Custom fixed Kc"
+      }
+    },
     "irrigation_type": {
       "options": {
         "sprinkler": "Sprinkler",
@@ -140,6 +189,30 @@
   },
   "entity": {
     "sensor": {
+      "et0_so_far": {
+        "name": "ET₀ so far today"
+      },
+      "water_demand": {
+        "name": "Water demand"
+      },
+      "etc_so_far": {
+        "name": "Use so far today"
+      },
+      "etc_today": {
+        "name": "Use today (forecast)"
+      },
+      "etc_tomorrow": {
+        "name": "Use tomorrow (forecast)"
+      },
+      "etc_7d": {
+        "name": "Use 7 days"
+      },
+      "kc": {
+        "name": "Crop coefficient"
+      },
+      "current_run_volume": {
+        "name": "Current run"
+      },
       "depletion": {
         "name": "Depletion"
       },
@@ -184,6 +257,16 @@
       },
       "min_temp_24h": {
         "name": "Minimum temperature 24 h"
+      },
+      "season_phase": {
+        "name": "Season phase",
+        "state": {
+          "dormant": "Dormant",
+          "sprouting": "Sprouting",
+          "growth": "Growth",
+          "peak": "Peak season",
+          "ripening": "Ripening"
+        }
       }
     },
     "binary_sensor": {

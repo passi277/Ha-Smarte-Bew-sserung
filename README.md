@@ -9,11 +9,12 @@ Tage lang vergleichen, bevor du ihr die Steuerung überlässt.
 
 | | Smart Irrigation | Smarte Bewässerung |
 |---|---|---|
-| Verdunstung | PyETO aus stündlichen Momentwerten | ET₀ (FAO-56) als Tageswert direkt von Open-Meteo |
+| Verdunstung | PyETO aus stündlichen Momentwerten | ET₀ (FAO-56) stündlich von Open-Meteo, Bedarf läuft über den Tag mit |
+| Pflanzen | ein fester Multiplikator | Pflanzenprofil (Rasen, Bananen, Gemüse …) mit Kc je Monat: Frühjahrswachstum, Hochsommer, Winterruhe |
 | Regen | je nach Mapping, Momentwerte können doppelt zählen | Tagessumme von Open-Meteo oder **eigener Regensensor** |
 | Bodenmodell | Eimer mit max. Größe | Wurzelzone mit Bodenart, Wurzeltiefe, TAW/RAW, Versickerung |
 | Echte Läufe | nur, wenn `linked_entity` oder ein Durchflusssensor gepflegt ist | erkennt jeden Ventillauf automatisch, auch die von Smart Irrigation |
-| Wassermenge | — | misst Liter am Ventilzähler, verwirft unplausible Werte und schätzt dann |
+| Wassermenge | — | summiert den Volumenstrom des Ventils (m³/h) über den Lauf; Mengenzähler oder Schätzung als Rückfall |
 | Bodenfeuchte | Schwelle | mischt Sensor und Modell, mit Kalibrierung trocken/nass |
 | Begründung | lange Formel | ein Satz: „Defizit 16 mm (Schwelle 15 mm) → 30 min / 510 l“ |
 | Störungen | — | Ventil offline, offen ohne Durchfluss, hängt offen, Durchsatz weicht ab |
@@ -40,32 +41,64 @@ Erst ab Home Assistant 2025.4 nutzbar, weil Zonen als Subentries angelegt werden
 - **Frostsperre** (4 °C) und **Windsperre** (30 km/h).
 - **Gewicht Bodenfeuchtesensor**: Beim Tagesabschluss werden Modell und Sensor gemischt (0,5 = halb/halb).
 
-**Zone:**
+**Zone** (zwei Schritte):
 
-| Feld | Bedeutung | Richtwert |
-|---|---|---|
-| Fläche, Durchsatz | daraus folgt die Niederschlagsrate | aus der Smart-Irrigation-Zone übernehmen |
-| Bewässerungsart | Regner 75 %, Tropfer 90 % Wirkungsgrad | |
-| Kc | Pflanzenfaktor | Rasen 0,8 · Bananen 1,1–1,2 |
-| Bodenart, Wurzeltiefe | nutzbares Bodenwasser (TAW) | Lehm, Rasen 20 cm, Bananen 40–60 cm |
-| Ausschöpfung p | Anteil von TAW, ab dem gegossen wird | 0,5 |
-| Min./max. Laufzeit | | 3 / 30 min |
-| Ventil | wird nur **beobachtet** | `switch.ventil_haus` o. ä. |
-| Mengenzähler | Liter je Lauf | `sensor.ventil_haus_real_time_irrigation_volume` |
-| Durchflusssensor | erkennt „offen, aber kein Wasser“ | optional |
-| Bodenfeuchtesensor | mit Kalibrierwerten trocken/nass | optional |
-| Vergleich mit | z. B. `sensor.smart_irrigation_haus` | optional |
+1. **Was wird bewässert?** Pflanze, Fläche und Durchsatz.
+2. **Details.** Die Werte sind aus dem Pflanzenprofil vorausgefüllt und lassen sich ändern.
+
+| Feld | Bedeutung |
+|---|---|
+| Pflanze | bestimmt Kc-Jahresverlauf, Wurzeltiefe, Gießschwelle und Bewässerungsart |
+| Anpassung Wasserbedarf | Faktor auf den Jahresverlauf: Schatten 0,8 · volle Sonne 1,1 · frisch gepflanzt 1,2 |
+| Bodenart, Wurzeltiefe | nutzbares Bodenwasser (TAW) |
+| Ausschöpfung p | Anteil von TAW, ab dem gegossen wird |
+| Min./max. Laufzeit | |
+| Ventil | wird nur **beobachtet** |
+| Volumenstrom | z. B. `sensor.ventil_haus_flow` (m³/h): misst die Liter je Lauf, erkennt „offen ohne Wasser“. Ohne Ventil gilt „Volumenstrom > 0“ als Lauf |
+| Mengenzähler | Rückfall, wenn kein Volumenstrom da ist |
+| Bodenfeuchtesensor | mit Kalibrierwerten trocken/nass |
+| Vergleich mit | z. B. `sensor.smart_irrigation_haus` |
+
+### Pflanzenprofile
+
+Der Pflanzenfaktor Kc gilt jeweils für die Monatsmitte. Dazwischen wird er Tag für Tag interpoliert, die Kurve
+springt also nicht am Monatswechsel.
+
+| Pflanze | Jan | Feb | Mär | Apr | Mai | Jun | Jul | Aug | Sep | Okt | Nov | Dez | Wurzel | p |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Rasen | 0,60 | 0,64 | 0,75 | **1,00** | 0,95 | 0,88 | 0,85 | 0,82 | 0,80 | 0,72 | 0,65 | 0,60 | 20 cm | 0,5 |
+| Spiel-/Sportrasen | 0,60 | 0,64 | 0,78 | **1,05** | 1,00 | 0,95 | 0,92 | 0,90 | 0,85 | 0,75 | 0,65 | 0,60 | 15 cm | 0,45 |
+| Bananen | 0,20 | 0,20 | 0,30 | 0,60 | 0,95 | 1,15 | **1,20** | **1,20** | 1,05 | 0,75 | 0,30 | 0,20 | 40 cm | 0,35 |
+| Gemüsebeet | 0,30 | 0,30 | 0,40 | 0,60 | 0,85 | 1,05 | **1,10** | 1,05 | 0,85 | 0,60 | 0,30 | 0,30 | 30 cm | 0,4 |
+| Stauden/Blumen | 0,30 | 0,30 | 0,45 | 0,70 | 0,85 | **0,90** | **0,90** | 0,85 | 0,70 | 0,50 | 0,30 | 0,30 | 30 cm | 0,45 |
+| Sträucher/Hecke | 0,30 | 0,30 | 0,40 | 0,55 | **0,60** | **0,60** | **0,60** | 0,55 | 0,50 | 0,40 | 0,30 | 0,30 | 50 cm | 0,5 |
+| Obstbäume | 0,30 | 0,30 | 0,45 | 0,60 | 0,85 | **0,95** | **0,95** | **0,95** | 0,80 | 0,60 | 0,35 | 0,30 | 80 cm | 0,5 |
+| Beerensträucher | 0,30 | 0,30 | 0,40 | 0,60 | 0,90 | **1,05** | **1,05** | 0,95 | 0,70 | 0,50 | 0,30 | 0,30 | 40 cm | 0,5 |
+
+Quellen:
+- **Rasen:** Kc-Monatswerte für Kühle-Saison-Rasen nach Meyer & Gibeault (University of California), an mitteleuropäische Wachstumsphasen angepasst. Der
+  Spitzenbedarf liegt im **Frühjahrswachstum im April**; im Hochsommer ist der Bedarf je Grad Verdunstung etwas
+  geringer. Die absolute Wassermenge ist im Sommer trotzdem am höchsten, weil ET₀ dann viel größer ist.
+- **Bananen, Gemüse, Obst, Beeren:** Kc-Phasen nach FAO-56, Tab. 12, auf die Freiland-Saison in Deutschland gelegt.
+  Bananen ruhen von November bis März.
+- **Sträucher, Stauden:** WUCOLS, Stufe „mittlerer Bedarf“.
+
+Wer keine dieser Pflanzen hat, wählt **„Eigener fester Kc“** und trägt einen festen Pflanzenfaktor ein.
 
 ### Vorschlag für die drei Zonen
 
-| Zone | Fläche | Durchsatz | Art | Kc | Wurzeltiefe | Vergleich |
-|---|---|---|---|---|---|---|
-| Volleyball | 200 m² | 23 l/min | Regner | 0,8 | 20 cm | `sensor.smart_irrigation_volleyball` |
-| Haus | 120 m² | 17 l/min | Regner | 0,8 | 20 cm | `sensor.smart_irrigation_haus` |
-| Bananen | 15 m² | 20 l/min | Regner/Tropfer prüfen | 1,2 | 40 cm | `sensor.smart_irrigation_bananen` |
+| Zone | Pflanze | Fläche | Durchsatz | Volumenstrom | Vergleich |
+|---|---|---|---|---|---|
+| Volleyball | Spiel-/Sportrasen | 200 m² | 23 l/min | `sensor.ventil_volleyball_flow` | `sensor.smart_irrigation_volleyball` |
+| Haus | Rasen | 120 m² | 17 l/min | `sensor.ventil_haus_flow` | `sensor.smart_irrigation_haus` |
+| Bananen | Bananen | 15 m² | 20 l/min | `sensor.ventil_bananen_flow` | `sensor.smart_irrigation_bananen` |
 
-Bei Smart Irrigation haben die Bananen einen Multiplikator von 3. Das entspricht keinem realistischen Kc und
-erzeugt Defizite bis −19 mm am Tag. Hier reicht 1,2 zusammen mit einer größeren Wurzeltiefe.
+Bei Smart Irrigation haben die Bananen einen Multiplikator von 3. Das entspricht keinem realistischen Kc. Das
+Bananenprofil kommt im Hochsommer auf 1,2 und rechnet mit 40 cm Wurzeltiefe.
+
+Als Mengenzähler eignet sich `real_time_irrigation_volume` bei diesen Ventilen nicht: Er steht auf 16777 l, was
+nach einem Überlaufwert aussieht. Der Volumenstrom (z. B. 1,3 m³/h ≈ 21,7 l/min) passt dagegen gut zum
+eingestellten Durchsatz.
 
 ## Entities
 
@@ -74,17 +107,32 @@ Tiefsttemperatur 24 h, Frostgefahr, Regensperre.
 
 **Je Zone:**
 
-- Erschöpfung (mm), mit TAW, RAW und 14-Tage-Verlauf als Attribute
-- Bodenwasser (%)
-- Empfohlene Dauer (min) und Empfohlene Menge (l)
-- Begründung
-- Bewässerung empfohlen
-- Letzter Lauf (l), mit Start, Dauer und Angabe, ob gemessen oder geschätzt
-- Gemessener Durchsatz (Median der letzten 5 Läufe)
-- Wasser gesamt (für das Energie-Dashboard)
-- Bewässert gerade
-- Störung, mit Liste der Ursachen
-- Abweichung zum Vergleich (min): positiv heißt, diese Integration würde länger gießen als Smart Irrigation
+Wasserbedarf, laufend aktualisiert (alle 5 Minuten und bei jeder Ventil- oder Sensoränderung):
+- **Wasserbedarf (l):** so viel Wasser fehlt **jetzt**, um den Boden wieder auf Feldkapazität zu bringen
+- **Erschöpfung (mm)** und **Bodenwasser (%)**
+- **Verbrauch bisher heute**, **Verbrauch heute (Prognose)**, **Verbrauch morgen (Prognose)** und **Verbrauch 7 Tage** (mm)
+
+Jahreszeit:
+- **Pflanzenfaktor** (Kc des Tages)
+- **Saisonphase:** Winterruhe, Austrieb, Wachstum, Hauptsaison oder Abreife
+
+Empfehlung:
+- **Empfohlene Dauer** (min) und **Empfohlene Menge** (l)
+- **Begründung**
+- **Bewässerung empfohlen**
+
+Läufe:
+- **Bewässert gerade**
+- **Laufender Lauf (l):** steigt live mit dem Volumenstrom
+- **Letzter Lauf (l):** mit Quelle Volumenstrom, Zähler oder Schätzung
+- **Gemessener Durchsatz**
+- **Wasser gesamt** (für das Energie-Dashboard)
+
+Kontrolle:
+- **Störung**, mit Liste der Ursachen
+- **Abweichung zum Vergleich** (min)
+
+Während eines Laufs sinkt die Erschöpfung live mit. Am Abend steigt sie mit der Verdunstung des Tages.
 
 ## Services
 
@@ -100,14 +148,20 @@ Für `entity_id` reicht eine beliebige Entity der Zone, z. B. ihr Sensor „Ersc
 ## So wird gerechnet
 
 ```
-Tagesabschluss (00:05 für den Vortag):
-  ETc        = ET₀ × Kc
-  Regen_eff  = max(0, Regen − 0,5 mm) × 0,9
-  Dr         = clamp(Dr + ETc − Regen_eff, 0, TAW)        # Überschuss versickert
-  (optional) Dr = Dr × (1 − w) + Dr_Sensor × w
+Jederzeit (laufender Tag):
+  Kc(heute)  = Pflanzenprofil, zwischen Monatsmitten interpoliert × Anpassung
+  ETc_bisher = ET₀ seit Mitternacht (stündlich, Open-Meteo) × Kc(heute)
+  Regen_eff  = max(0, Regen seit Mitternacht − 0,5 mm) × 0,9
+  Dr         = clamp(Dr_Tagesbeginn + ETc_bisher − Regen_eff − laufender Lauf, 0, TAW)
+  Bedarf (l) = Dr / Wirkungsgrad × Fläche
 
-Bei jedem Ventillauf sofort:
-  Dr         = Dr − Liter / Fläche × Wirkungsgrad
+Lauf beendet:
+  Liter      = ∫ Volumenstrom dt   (sonst Zähler, sonst Laufzeit × Durchsatz)
+  Dr         = max(0, Dr − Liter / Fläche × Wirkungsgrad)   # Überschuss versickert
+
+Tagesabschluss (00:05):
+  derselbe Wert mit dem vollen Tag → Dr_Tagesbeginn für morgen
+  (optional) gemischt mit dem Bodenfeuchtesensor
 
 Empfehlung:
   gießen, wenn Dr ≥ RAW (= p × TAW) und keine Sperre greift

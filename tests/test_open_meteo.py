@@ -21,6 +21,7 @@ PAYLOAD = {
         "precipitation": [0.0, 0.4, None],
         "temperature_2m": [9.0, 10.0, 11.0],
         "wind_speed_10m": [5.0, 6.0, 7.0],
+        "et0_fao_evapotranspiration": [0.1, 0.2, 0.3],
     },
 }
 
@@ -30,10 +31,15 @@ def test_parse() -> None:
     # Tag ohne ET0 wird ausgelassen
     assert list(data.daily) == [date(2026, 10, 8), date(2026, 10, 9)]
     assert data.daily[date(2026, 10, 8)].rain_mm == 4.2
-    now = datetime(2026, 10, 9, 11, 30)
-    upcoming = data.next_hours(now, 24)
-    assert [h.rain_mm for h in upcoming] == [0.4, 0.0]
+    # Stundenwerte gelten für die Stunde davor: 11:00 = 10–11 Uhr
+    now = datetime(2026, 10, 9, 10, 30)
+    assert [h.rain_mm for h in data.next_hours(now, 24)] == [0.4, 0.0]
     assert data.current_hour(now).wind_kmh == 6.0
+    assert data.hourly[1].et0_mm == 0.2
+    # Halbe Stunde 10:30–11:00 von 0,4 mm, dann 0 mm
+    assert data.upcoming(now, 24)[1] == pytest.approx(0.2)
+    # Tageswert: Stunden decken den Tag nicht ab → Tageswerte
+    assert data.day_totals(date(2026, 10, 8)) == (1.6, 4.2)
 
 
 def test_parse_broken() -> None:

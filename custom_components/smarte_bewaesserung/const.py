@@ -9,6 +9,9 @@ DOMAIN: Final = "smarte_bewaesserung"
 SUBENTRY_ZONE: Final = "zone"
 
 UPDATE_INTERVAL: Final = timedelta(hours=1)
+# Laufender Wasserbedarf wird ohne neuen Wetterabruf so oft neu gerechnet.
+LIVE_INTERVAL: Final = timedelta(minutes=5)
+REFRESH_COOLDOWN_SECONDS: Final = 10
 STORAGE_VERSION: Final = 1
 HISTORY_DAYS: Final = 14
 
@@ -28,6 +31,8 @@ DEFAULT_SOIL_SENSOR_WEIGHT: Final = 0.5
 CONF_AREA: Final = "area_m2"
 CONF_THROUGHPUT: Final = "throughput_lpm"
 CONF_KC: Final = "kc"
+CONF_PLANT: Final = "plant"
+CONF_KC_FACTOR: Final = "kc_factor"
 CONF_SOIL_TYPE: Final = "soil_type"
 CONF_ROOT_DEPTH: Final = "root_depth_cm"
 CONF_DEPLETION_FRACTION: Final = "depletion_fraction"

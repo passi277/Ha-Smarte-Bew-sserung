@@ -50,6 +50,22 @@
           "title": "Neue Zone",
           "data": {
             "name": "Name",
+            "plant": "Was wird bewässert?",
+            "area_m2": "Fläche",
+            "throughput_lpm": "Durchsatz"
+          },
+          "data_description": {
+            "plant": "Bestimmt den Wasserbedarf über das Jahr (Pflanzenfaktor Kc je Monat), Wurzeltiefe und Gießschwelle.",
+            "throughput_lpm": "Liter pro Minute bei offenem Ventil (1,3 m³/h = 21,7 l/min)."
+          }
+        },
+        "details": {
+          "title": "Details der Zone",
+          "description": "Vorschläge kommen aus dem Pflanzenprofil. Pflanzenfaktor Kc im Jahresverlauf: {kc_curve}",
+          "data": {
+            "name": "Name",
+            "plant": "Pflanze",
+            "kc_factor": "Anpassung Wasserbedarf (1,0 = Standard)",
             "area_m2": "Fläche",
             "throughput_lpm": "Durchsatz",
             "irrigation_type": "Bewässerungsart",
@@ -68,6 +84,8 @@
             "compare_entity": "Vergleich mit (z. B. Smart-Irrigation-Dauer)"
           },
           "data_description": {
+            "kc_factor": "Multipliziert den Jahresverlauf: Schatten 0,8 · volle Sonne/Südhang 1,1 · neu angelegt 1,2",
+            "flow_sensor": "Volumenstrom des Ventils (z. B. sensor.ventil_haus_flow in m³/h). Die Liter je Lauf werden daraus aufsummiert.",
             "kc": "Rasen 0,8 · Gemüse 1,0 · Bananen 1,1–1,2 · Sträucher 0,5",
             "root_depth_cm": "Rasen 15–20 cm · Gemüse 30 cm · Bananen 40–60 cm",
             "depletion_fraction": "Rasen 0,5 · empfindliche Pflanzen 0,35",
@@ -79,6 +97,22 @@
           "title": "Zone ändern",
           "data": {
             "name": "Name",
+            "plant": "Was wird bewässert?",
+            "area_m2": "Fläche",
+            "throughput_lpm": "Durchsatz"
+          },
+          "data_description": {
+            "plant": "Bestimmt den Wasserbedarf über das Jahr (Pflanzenfaktor Kc je Monat), Wurzeltiefe und Gießschwelle.",
+            "throughput_lpm": "Liter pro Minute bei offenem Ventil (1,3 m³/h = 21,7 l/min)."
+          }
+        },
+        "reconfigure_details": {
+          "title": "Details der Zone",
+          "description": "Vorschläge kommen aus dem Pflanzenprofil. Pflanzenfaktor Kc im Jahresverlauf: {kc_curve}",
+          "data": {
+            "name": "Name",
+            "plant": "Pflanze",
+            "kc_factor": "Anpassung Wasserbedarf (1,0 = Standard)",
             "area_m2": "Fläche",
             "throughput_lpm": "Durchsatz",
             "irrigation_type": "Bewässerungsart",
@@ -97,6 +131,8 @@
             "compare_entity": "Vergleich mit (z. B. Smart-Irrigation-Dauer)"
           },
           "data_description": {
+            "kc_factor": "Multipliziert den Jahresverlauf: Schatten 0,8 · volle Sonne/Südhang 1,1 · neu angelegt 1,2",
+            "flow_sensor": "Volumenstrom des Ventils (z. B. sensor.ventil_haus_flow in m³/h). Die Liter je Lauf werden daraus aufsummiert.",
             "kc": "Rasen 0,8 · Gemüse 1,0 · Bananen 1,1–1,2 · Sträucher 0,5",
             "root_depth_cm": "Rasen 15–20 cm · Gemüse 30 cm · Bananen 40–60 cm",
             "depletion_fraction": "Rasen 0,5 · empfindliche Pflanzen 0,35",
@@ -125,6 +161,19 @@
         "clay": "Ton"
       }
     },
+    "plant": {
+      "options": {
+        "lawn": "Rasen",
+        "sports_lawn": "Spiel-/Sportrasen",
+        "banana": "Bananen",
+        "vegetables": "Gemüsebeet",
+        "perennials": "Stauden/Blumenbeet",
+        "shrubs": "Sträucher/Hecke",
+        "fruit_trees": "Obstbäume",
+        "berries": "Beerensträucher",
+        "custom": "Eigener fester Kc"
+      }
+    },
     "irrigation_type": {
       "options": {
         "sprinkler": "Regner",
@@ -140,6 +189,30 @@
   },
   "entity": {
     "sensor": {
+      "et0_so_far": {
+        "name": "ET₀ bisher heute"
+      },
+      "water_demand": {
+        "name": "Wasserbedarf"
+      },
+      "etc_so_far": {
+        "name": "Verbrauch bisher heute"
+      },
+      "etc_today": {
+        "name": "Verbrauch heute (Prognose)"
+      },
+      "etc_tomorrow": {
+        "name": "Verbrauch morgen (Prognose)"
+      },
+      "etc_7d": {
+        "name": "Verbrauch 7 Tage"
+      },
+      "kc": {
+        "name": "Pflanzenfaktor"
+      },
+      "current_run_volume": {
+        "name": "Laufender Lauf"
+      },
       "depletion": {
         "name": "Erschöpfung"
       },
@@ -184,6 +257,16 @@
       },
       "min_temp_24h": {
         "name": "Tiefsttemperatur 24 h"
+      },
+      "season_phase": {
+        "name": "Saisonphase",
+        "state": {
+          "dormant": "Winterruhe",
+          "sprouting": "Austrieb",
+          "growth": "Wachstum",
+          "peak": "Hauptsaison",
+          "ripening": "Abreife"
+        }
       }
     },
     "binary_sensor": {

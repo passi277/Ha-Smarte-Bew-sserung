@@ -11,10 +11,16 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.smarte_bewaesserung.const import (
     CONF_AREA,
+    CONF_DEPLETION_FRACTION,
+    CONF_IRRIGATION_TYPE,
+    CONF_KC_FACTOR,
     CONF_MAX_DURATION,
     CONF_MIN_DURATION,
+    CONF_PLANT,
     CONF_RAIN_SKIP_MM,
+    CONF_ROOT_DEPTH,
     CONF_SOIL_DRY_PCT,
+    CONF_SOIL_TYPE,
     CONF_SOIL_WET_PCT,
     CONF_THROUGHPUT,
     DOMAIN,
@@ -37,6 +43,26 @@ async def test_user_flow(hass: HomeAssistant, mock_fetch) -> None:
     assert result["type"] is FlowResultType.ABORT
 
 
+DETAILS = {
+    CONF_IRRIGATION_TYPE: "drip",
+    CONF_KC_FACTOR: 1.0,
+    CONF_SOIL_TYPE: "loam",
+    CONF_ROOT_DEPTH: 40,
+    CONF_DEPLETION_FRACTION: 0.35,
+    CONF_MIN_DURATION: 3,
+    CONF_MAX_DURATION: 30,
+    CONF_SOIL_DRY_PCT: 10,
+    CONF_SOIL_WET_PCT: 40,
+}
+
+
+def _suggested(result, key):
+    for field in result["data_schema"].schema:
+        if field == key:
+            return field.description["suggested_value"]
+    raise AssertionError(key)
+
+
 async def test_zone_subentry_flow(hass: HomeAssistant, mock_fetch) -> None:
     mock_fetch.return_value = make_weather(date.today())
     entry = MockConfigEntry(domain=DOMAIN, unique_id=DOMAIN, title="Smarte Bewässerung")
@@ -47,36 +73,50 @@ async def test_zone_subentry_flow(hass: HomeAssistant, mock_fetch) -> None:
     result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, SUBENTRY_ZONE), context={"source": config_entries.SOURCE_USER}
     )
-    assert result["type"] is FlowResultType.FORM
-
-    base = {"name": "Bananen", CONF_AREA: 15, CONF_THROUGHPUT: 20}
+    assert result["step_id"] == "user"
     result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {**base, CONF_MIN_DURATION: 40, CONF_MAX_DURATION: 30}
+        result["flow_id"], {"name": "Bananen", CONF_PLANT: "banana", CONF_AREA: 15, CONF_THROUGHPUT: 20}
+    )
+    assert result["step_id"] == "details"
+    # Vorschläge aus dem Bananen-Profil
+    assert _suggested(result, CONF_ROOT_DEPTH) == 40
+    assert _suggested(result, CONF_DEPLETION_FRACTION) == 0.35
+    assert _suggested(result, CONF_IRRIGATION_TYPE) == "drip"
+    assert "Jul 1,20" in result["description_placeholders"]["kc_curve"]
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {**DETAILS, CONF_MIN_DURATION: 40, CONF_MAX_DURATION: 30}
     )
     assert result["errors"] == {CONF_MIN_DURATION: "min_above_max"}
-
     result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {**base, CONF_SOIL_DRY_PCT: 40, CONF_SOIL_WET_PCT: 20}
+        result["flow_id"], {**DETAILS, CONF_SOIL_DRY_PCT: 40, CONF_SOIL_WET_PCT: 20}
     )
     assert result["errors"] == {CONF_SOIL_WET_PCT: "wet_not_above_dry"}
 
-    result = await hass.config_entries.subentries.async_configure(result["flow_id"], base)
+    result = await hass.config_entries.subentries.async_configure(result["flow_id"], DETAILS)
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
 
     subentry = next(iter(entry.subentries.values()))
     assert subentry.title == "Bananen"
+    assert subentry.data[CONF_PLANT] == "banana"
     # Neu geladen: Zone ist im Coordinator
     assert [z.name for z in entry.runtime_data.zones.values()] == ["Bananen"]
 
+    # Ändern: auf Rasen umstellen → Rasen-Vorschläge für Wurzeltiefe
     result = await entry.start_subentry_reconfigure_flow(hass, subentry.subentry_id)
     assert result["step_id"] == "reconfigure"
     result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {**dict(subentry.data), CONF_AREA: 18}
+        result["flow_id"], {"name": "Bananen", CONF_PLANT: "lawn", CONF_AREA: 18, CONF_THROUGHPUT: 20}
     )
+    assert result["step_id"] == "reconfigure_details"
+    assert _suggested(result, CONF_ROOT_DEPTH) == 20
+    assert _suggested(result, CONF_SOIL_TYPE) == "loam"
+    result = await hass.config_entries.subentries.async_configure(result["flow_id"], DETAILS)
     assert result["reason"] == "reconfigure_successful"
     await hass.async_block_till_done()
     assert entry.subentries[subentry.subentry_id].data[CONF_AREA] == 18
+    assert entry.subentries[subentry.subentry_id].data[CONF_PLANT] == "lawn"
 
 
 async def test_options_flow(hass: HomeAssistant, mock_fetch) -> None:

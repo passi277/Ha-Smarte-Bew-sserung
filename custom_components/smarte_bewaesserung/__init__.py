@@ -107,7 +107,7 @@ def _register_services(hass: HomeAssistant) -> None:
             measured=measured,
         )
         coordinator.record_run(zone, run)
-        coordinator.refresh_snapshot()
+        coordinator.refresh_now()
 
     async def set_depletion(call: ServiceCall) -> None:
         coordinator, zone = _resolve_zone(hass, call.data[ATTR_ENTITY_ID])
