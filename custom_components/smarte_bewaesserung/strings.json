@@ -1,0 +1,277 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smarte Bewässerung",
+        "description": "Weather comes from Open-Meteo for your Home Assistant location. Add zones afterwards with “Add zone”.",
+        "data": {
+          "rain_sensor": "Rain sensor (optional)",
+          "rain_skip_mm": "Skip when rain forecast (24 h) reaches",
+          "frost_c": "Frost lock below",
+          "wind_kmh": "Wind lock above",
+          "soil_sensor_weight": "Soil sensor weight (0 = model only, 1 = sensor only)"
+        },
+        "data_description": {
+          "rain_sensor": "Rain amount (mm counter), rain rate (mm/h) or binary rain sensor. An amount counter replaces Open-Meteo rain.",
+          "soil_sensor_weight": "At day close the depletion is blended from model and soil moisture sensor."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Settings",
+        "data": {
+          "rain_sensor": "Rain sensor (optional)",
+          "rain_skip_mm": "Skip when rain forecast (24 h) reaches",
+          "frost_c": "Frost lock below",
+          "wind_kmh": "Wind lock above",
+          "soil_sensor_weight": "Soil sensor weight (0 = model only, 1 = sensor only)"
+        },
+        "data_description": {
+          "rain_sensor": "Rain amount (mm counter), rain rate (mm/h) or binary rain sensor. An amount counter replaces Open-Meteo rain.",
+          "soil_sensor_weight": "At day close the depletion is blended from model and soil moisture sensor."
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "zone": {
+      "initiate_flow": {
+        "user": "Add zone"
+      },
+      "entry_type": "Zone",
+      "step": {
+        "user": {
+          "title": "New zone",
+          "data": {
+            "name": "Name",
+            "area_m2": "Area",
+            "throughput_lpm": "Throughput",
+            "irrigation_type": "Irrigation type",
+            "kc": "Crop coefficient Kc",
+            "soil_type": "Soil type",
+            "root_depth_cm": "Root depth",
+            "depletion_fraction": "Depletion fraction p",
+            "min_duration_min": "Minimum run time",
+            "max_duration_min": "Maximum run time",
+            "valve_entity": "Valve (observed only)",
+            "volume_sensor": "Valve volume counter",
+            "flow_sensor": "Flow sensor",
+            "soil_moisture_sensor": "Soil moisture sensor",
+            "soil_dry_pct": "Soil moisture dry (wilting point)",
+            "soil_wet_pct": "Soil moisture wet (field capacity)",
+            "compare_entity": "Compare with (e.g. Smart Irrigation duration)"
+          },
+          "data_description": {
+            "kc": "Lawn 0.8 · vegetables 1.0 · banana 1.1–1.2 · shrubs 0.5",
+            "root_depth_cm": "Lawn 15–20 cm · vegetables 30 cm · banana 40–60 cm",
+            "depletion_fraction": "Lawn 0.5 · sensitive plants 0.35",
+            "valve_entity": "The integration never switches the valve. It only detects runs, including Smart Irrigation's.",
+            "volume_sensor": "e.g. sensor.valve_real_time_irrigation_volume"
+          }
+        },
+        "reconfigure": {
+          "title": "Edit zone",
+          "data": {
+            "name": "Name",
+            "area_m2": "Area",
+            "throughput_lpm": "Throughput",
+            "irrigation_type": "Irrigation type",
+            "kc": "Crop coefficient Kc",
+            "soil_type": "Soil type",
+            "root_depth_cm": "Root depth",
+            "depletion_fraction": "Depletion fraction p",
+            "min_duration_min": "Minimum run time",
+            "max_duration_min": "Maximum run time",
+            "valve_entity": "Valve (observed only)",
+            "volume_sensor": "Valve volume counter",
+            "flow_sensor": "Flow sensor",
+            "soil_moisture_sensor": "Soil moisture sensor",
+            "soil_dry_pct": "Soil moisture dry (wilting point)",
+            "soil_wet_pct": "Soil moisture wet (field capacity)",
+            "compare_entity": "Compare with (e.g. Smart Irrigation duration)"
+          },
+          "data_description": {
+            "kc": "Lawn 0.8 · vegetables 1.0 · banana 1.1–1.2 · shrubs 0.5",
+            "root_depth_cm": "Lawn 15–20 cm · vegetables 30 cm · banana 40–60 cm",
+            "depletion_fraction": "Lawn 0.5 · sensitive plants 0.35",
+            "valve_entity": "The integration never switches the valve. It only detects runs, including Smart Irrigation's.",
+            "volume_sensor": "e.g. sensor.valve_real_time_irrigation_volume"
+          }
+        }
+      },
+      "error": {
+        "min_above_max": "Minimum run time exceeds maximum.",
+        "wet_not_above_dry": "“Wet” must be greater than “dry”."
+      },
+      "abort": {
+        "reconfigure_successful": "Zone saved."
+      }
+    }
+  },
+  "selector": {
+    "soil_type": {
+      "options": {
+        "sand": "Sand",
+        "loamy_sand": "Loamy sand",
+        "sandy_loam": "Sandy loam",
+        "loam": "Loam",
+        "silt_loam": "Silt loam",
+        "clay": "Clay"
+      }
+    },
+    "irrigation_type": {
+      "options": {
+        "sprinkler": "Sprinkler",
+        "drip": "Drip"
+      }
+    },
+    "calibration_point": {
+      "options": {
+        "dry": "Dry",
+        "wet": "Wet"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "depletion": {
+        "name": "Depletion"
+      },
+      "soil_water": {
+        "name": "Soil water"
+      },
+      "recommended_duration": {
+        "name": "Recommended duration"
+      },
+      "recommended_volume": {
+        "name": "Recommended volume"
+      },
+      "reason": {
+        "name": "Reason"
+      },
+      "last_run_volume": {
+        "name": "Last run"
+      },
+      "measured_throughput": {
+        "name": "Measured throughput"
+      },
+      "water_total": {
+        "name": "Total water"
+      },
+      "compare_smart_irrigation": {
+        "name": "Difference to comparison"
+      },
+      "et0_today": {
+        "name": "ET₀ today"
+      },
+      "et0_yesterday": {
+        "name": "ET₀ yesterday"
+      },
+      "rain_today": {
+        "name": "Rain today"
+      },
+      "rain_yesterday": {
+        "name": "Rain yesterday"
+      },
+      "rain_forecast_24h": {
+        "name": "Rain forecast 24 h"
+      },
+      "min_temp_24h": {
+        "name": "Minimum temperature 24 h"
+      }
+    },
+    "binary_sensor": {
+      "frost": {
+        "name": "Frost risk"
+      },
+      "rain_block": {
+        "name": "Rain lock"
+      },
+      "irrigation_recommended": {
+        "name": "Irrigation recommended"
+      },
+      "problem": {
+        "name": "Problem"
+      },
+      "watering": {
+        "name": "Watering"
+      }
+    }
+  },
+  "services": {
+    "recalculate": {
+      "name": "Recalculate",
+      "description": "Reload weather and recalculate all zones."
+    },
+    "record_irrigation": {
+      "name": "Record irrigation",
+      "description": "Manually record a run (e.g. watering can).",
+      "fields": {
+        "entity_id": {
+          "name": "Zone (any entity of the zone)",
+          "description": "Any entity of the zone, e.g. its depletion."
+        },
+        "liters": {
+          "name": "Liters",
+          "description": "Applied water volume."
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "Run time; volume estimated from throughput."
+        }
+      }
+    },
+    "set_depletion": {
+      "name": "Set depletion",
+      "description": "Manually set the zone's depletion, e.g. after heavy rain.",
+      "fields": {
+        "entity_id": {
+          "name": "Zone (any entity of the zone)",
+          "description": "Any entity of the zone, e.g. its depletion."
+        },
+        "depletion_mm": {
+          "name": "Depletion",
+          "description": "0 = soil full."
+        },
+        "soil_water_pct": {
+          "name": "Soil water",
+          "description": "Alternatively in percent (100 = full)."
+        }
+      }
+    },
+    "calibrate_soil_sensor": {
+      "name": "Calibrate soil sensor",
+      "description": "Store the current reading as dry or wet.",
+      "fields": {
+        "entity_id": {
+          "name": "Zone (any entity of the zone)",
+          "description": "Any entity of the zone, e.g. its depletion."
+        },
+        "point": {
+          "name": "Point",
+          "description": "Dry = wilting point, wet = one day after deep watering."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_a_zone": {
+      "message": "{entity} does not belong to a zone of this integration."
+    },
+    "liters_or_minutes": {
+      "message": "Please provide liters or minutes."
+    },
+    "depletion_or_pct": {
+      "message": "Please provide depletion or soil water."
+    },
+    "no_soil_value": {
+      "message": "The soil moisture sensor has no value."
+    }
+  }
+}

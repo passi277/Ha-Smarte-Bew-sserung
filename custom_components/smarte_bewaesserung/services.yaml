@@ -1,0 +1,61 @@
+recalculate:
+
+record_irrigation:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          integration: smarte_bewaesserung
+    liters:
+      selector:
+        number:
+          min: 0
+          max: 10000
+          unit_of_measurement: L
+          mode: box
+    minutes:
+      selector:
+        number:
+          min: 0
+          max: 600
+          unit_of_measurement: min
+          mode: box
+
+set_depletion:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          integration: smarte_bewaesserung
+    depletion_mm:
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 0.1
+          unit_of_measurement: mm
+          mode: box
+    soil_water_pct:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+
+calibrate_soil_sensor:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          integration: smarte_bewaesserung
+    point:
+      required: true
+      selector:
+        select:
+          translation_key: calibration_point
+          options:
+            - dry
+            - wet

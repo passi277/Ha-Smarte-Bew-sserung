@@ -1,0 +1,277 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smarte Bewässerung",
+        "description": "Wetter kommt von Open-Meteo für den Standort deines Home Assistant. Zonen fügst du danach über „Zone hinzufügen“ hinzu.",
+        "data": {
+          "rain_sensor": "Regensensor (optional)",
+          "rain_skip_mm": "Nicht gießen ab Regenvorhersage (24 h)",
+          "frost_c": "Frostsperre unter",
+          "wind_kmh": "Windsperre über",
+          "soil_sensor_weight": "Gewicht Bodenfeuchtesensor (0 = nur Modell, 1 = nur Sensor)"
+        },
+        "data_description": {
+          "rain_sensor": "Regenmenge (mm-Zähler), Regenintensität (mm/h) oder binärer Regensensor. Ein Mengenzähler ersetzt den Open-Meteo-Regen.",
+          "soil_sensor_weight": "Beim Tagesabschluss wird die Erschöpfung aus Modell und Bodenfeuchtesensor gemischt."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Einstellungen",
+        "data": {
+          "rain_sensor": "Regensensor (optional)",
+          "rain_skip_mm": "Nicht gießen ab Regenvorhersage (24 h)",
+          "frost_c": "Frostsperre unter",
+          "wind_kmh": "Windsperre über",
+          "soil_sensor_weight": "Gewicht Bodenfeuchtesensor (0 = nur Modell, 1 = nur Sensor)"
+        },
+        "data_description": {
+          "rain_sensor": "Regenmenge (mm-Zähler), Regenintensität (mm/h) oder binärer Regensensor. Ein Mengenzähler ersetzt den Open-Meteo-Regen.",
+          "soil_sensor_weight": "Beim Tagesabschluss wird die Erschöpfung aus Modell und Bodenfeuchtesensor gemischt."
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "zone": {
+      "initiate_flow": {
+        "user": "Zone hinzufügen"
+      },
+      "entry_type": "Zone",
+      "step": {
+        "user": {
+          "title": "Neue Zone",
+          "data": {
+            "name": "Name",
+            "area_m2": "Fläche",
+            "throughput_lpm": "Durchsatz",
+            "irrigation_type": "Bewässerungsart",
+            "kc": "Pflanzenfaktor Kc",
+            "soil_type": "Bodenart",
+            "root_depth_cm": "Wurzeltiefe",
+            "depletion_fraction": "Ausschöpfung p (Anteil bis zum Gießen)",
+            "min_duration_min": "Mindestlaufzeit",
+            "max_duration_min": "Maximale Laufzeit",
+            "valve_entity": "Ventil (nur beobachten)",
+            "volume_sensor": "Mengenzähler des Ventils",
+            "flow_sensor": "Durchflusssensor",
+            "soil_moisture_sensor": "Bodenfeuchtesensor",
+            "soil_dry_pct": "Bodenfeuchte trocken (Welkepunkt)",
+            "soil_wet_pct": "Bodenfeuchte nass (Feldkapazität)",
+            "compare_entity": "Vergleich mit (z. B. Smart-Irrigation-Dauer)"
+          },
+          "data_description": {
+            "kc": "Rasen 0,8 · Gemüse 1,0 · Bananen 1,1–1,2 · Sträucher 0,5",
+            "root_depth_cm": "Rasen 15–20 cm · Gemüse 30 cm · Bananen 40–60 cm",
+            "depletion_fraction": "Rasen 0,5 · empfindliche Pflanzen 0,35",
+            "valve_entity": "Die Integration schaltet das Ventil nie. Sie erkennt nur Läufe, auch die von Smart Irrigation.",
+            "volume_sensor": "z. B. sensor.ventil_haus_real_time_irrigation_volume"
+          }
+        },
+        "reconfigure": {
+          "title": "Zone ändern",
+          "data": {
+            "name": "Name",
+            "area_m2": "Fläche",
+            "throughput_lpm": "Durchsatz",
+            "irrigation_type": "Bewässerungsart",
+            "kc": "Pflanzenfaktor Kc",
+            "soil_type": "Bodenart",
+            "root_depth_cm": "Wurzeltiefe",
+            "depletion_fraction": "Ausschöpfung p (Anteil bis zum Gießen)",
+            "min_duration_min": "Mindestlaufzeit",
+            "max_duration_min": "Maximale Laufzeit",
+            "valve_entity": "Ventil (nur beobachten)",
+            "volume_sensor": "Mengenzähler des Ventils",
+            "flow_sensor": "Durchflusssensor",
+            "soil_moisture_sensor": "Bodenfeuchtesensor",
+            "soil_dry_pct": "Bodenfeuchte trocken (Welkepunkt)",
+            "soil_wet_pct": "Bodenfeuchte nass (Feldkapazität)",
+            "compare_entity": "Vergleich mit (z. B. Smart-Irrigation-Dauer)"
+          },
+          "data_description": {
+            "kc": "Rasen 0,8 · Gemüse 1,0 · Bananen 1,1–1,2 · Sträucher 0,5",
+            "root_depth_cm": "Rasen 15–20 cm · Gemüse 30 cm · Bananen 40–60 cm",
+            "depletion_fraction": "Rasen 0,5 · empfindliche Pflanzen 0,35",
+            "valve_entity": "Die Integration schaltet das Ventil nie. Sie erkennt nur Läufe, auch die von Smart Irrigation.",
+            "volume_sensor": "z. B. sensor.ventil_haus_real_time_irrigation_volume"
+          }
+        }
+      },
+      "error": {
+        "min_above_max": "Mindestlaufzeit ist größer als die maximale Laufzeit.",
+        "wet_not_above_dry": "„Nass“ muss größer als „trocken“ sein."
+      },
+      "abort": {
+        "reconfigure_successful": "Zone gespeichert."
+      }
+    }
+  },
+  "selector": {
+    "soil_type": {
+      "options": {
+        "sand": "Sand",
+        "loamy_sand": "Lehmiger Sand",
+        "sandy_loam": "Sandiger Lehm",
+        "loam": "Lehm",
+        "silt_loam": "Schluffiger Lehm",
+        "clay": "Ton"
+      }
+    },
+    "irrigation_type": {
+      "options": {
+        "sprinkler": "Regner",
+        "drip": "Tropfer"
+      }
+    },
+    "calibration_point": {
+      "options": {
+        "dry": "Trocken",
+        "wet": "Nass"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "depletion": {
+        "name": "Erschöpfung"
+      },
+      "soil_water": {
+        "name": "Bodenwasser"
+      },
+      "recommended_duration": {
+        "name": "Empfohlene Dauer"
+      },
+      "recommended_volume": {
+        "name": "Empfohlene Menge"
+      },
+      "reason": {
+        "name": "Begründung"
+      },
+      "last_run_volume": {
+        "name": "Letzter Lauf"
+      },
+      "measured_throughput": {
+        "name": "Gemessener Durchsatz"
+      },
+      "water_total": {
+        "name": "Wasser gesamt"
+      },
+      "compare_smart_irrigation": {
+        "name": "Abweichung zum Vergleich"
+      },
+      "et0_today": {
+        "name": "ET₀ heute"
+      },
+      "et0_yesterday": {
+        "name": "ET₀ gestern"
+      },
+      "rain_today": {
+        "name": "Regen heute"
+      },
+      "rain_yesterday": {
+        "name": "Regen gestern"
+      },
+      "rain_forecast_24h": {
+        "name": "Regenvorhersage 24 h"
+      },
+      "min_temp_24h": {
+        "name": "Tiefsttemperatur 24 h"
+      }
+    },
+    "binary_sensor": {
+      "frost": {
+        "name": "Frostgefahr"
+      },
+      "rain_block": {
+        "name": "Regensperre"
+      },
+      "irrigation_recommended": {
+        "name": "Bewässerung empfohlen"
+      },
+      "problem": {
+        "name": "Störung"
+      },
+      "watering": {
+        "name": "Bewässert gerade"
+      }
+    }
+  },
+  "services": {
+    "recalculate": {
+      "name": "Neu berechnen",
+      "description": "Wetter neu laden und alle Zonen neu berechnen."
+    },
+    "record_irrigation": {
+      "name": "Lauf eintragen",
+      "description": "Einen Lauf ohne Ventil-Entity von Hand verbuchen (z. B. Gießkanne).",
+      "fields": {
+        "entity_id": {
+          "name": "Zone (beliebige Entity der Zone)",
+          "description": "Eine Entity der Zone, z. B. ihre Erschöpfung."
+        },
+        "liters": {
+          "name": "Liter",
+          "description": "Ausgebrachte Wassermenge."
+        },
+        "minutes": {
+          "name": "Minuten",
+          "description": "Laufzeit; Menge wird über den Durchsatz geschätzt."
+        }
+      }
+    },
+    "set_depletion": {
+      "name": "Wasserkonto setzen",
+      "description": "Erschöpfung der Zone von Hand setzen, z. B. nach Starkregen.",
+      "fields": {
+        "entity_id": {
+          "name": "Zone (beliebige Entity der Zone)",
+          "description": "Eine Entity der Zone, z. B. ihre Erschöpfung."
+        },
+        "depletion_mm": {
+          "name": "Erschöpfung",
+          "description": "0 = Boden voll."
+        },
+        "soil_water_pct": {
+          "name": "Bodenwasser",
+          "description": "Alternativ in Prozent (100 = voll)."
+        }
+      }
+    },
+    "calibrate_soil_sensor": {
+      "name": "Bodenfeuchtesensor kalibrieren",
+      "description": "Aktuellen Messwert als trocken oder nass speichern.",
+      "fields": {
+        "entity_id": {
+          "name": "Zone (beliebige Entity der Zone)",
+          "description": "Eine Entity der Zone, z. B. ihre Erschöpfung."
+        },
+        "point": {
+          "name": "Punkt",
+          "description": "Trocken = Welkepunkt, nass = ein Tag nach kräftigem Gießen."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_a_zone": {
+      "message": "{entity} gehört zu keiner Zone dieser Integration."
+    },
+    "liters_or_minutes": {
+      "message": "Bitte Liter oder Minuten angeben."
+    },
+    "depletion_or_pct": {
+      "message": "Bitte Erschöpfung oder Bodenwasser angeben."
+    },
+    "no_soil_value": {
+      "message": "Der Bodenfeuchtesensor liefert gerade keinen Wert."
+    }
+  }
+}
