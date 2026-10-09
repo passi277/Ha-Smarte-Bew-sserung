@@ -165,6 +165,7 @@ class IrrigationTracker:
         self._no_flow = False
         self._flow_liters = 0.0
         self._flow_seen = False
+        self._flow_reported = False
         self._flow_lpm = 0.0
         self._flow_since: datetime | None = None
         self.stuck_open = False
@@ -193,7 +194,7 @@ class IrrigationTracker:
         if self._start is None:
             return 0.0
         now = dt_util.utcnow()
-        if self.flow_sensor and self._flow_seen:
+        if self.flow_sensor and self._flow_reported:
             since = self._flow_since or now
             return self._flow_liters + self._flow_lpm * (now - since).total_seconds() / 60
         return (now - self._start).total_seconds() / 60 * self.throughput_lpm
@@ -250,6 +251,7 @@ class IrrigationTracker:
             self._accumulate(now)
             if flow is not None:
                 self._flow_lpm = flow
+                self._flow_reported = True
                 if flow > 0:
                     self._flow_seen = True
                     self._no_flow = False
@@ -277,6 +279,7 @@ class IrrigationTracker:
         flow = self.current_flow_lpm
         self._flow_lpm = flow or 0.0
         self._flow_seen = bool(flow)
+        self._flow_reported = flow is not None
         self._flow_since = now
         self.stuck_open = False
         self._cancel_timers()
@@ -313,6 +316,8 @@ class IrrigationTracker:
         start_volume = self._start_volume
         no_flow = self._no_flow
         flow_liters = self._flow_liters if self._flow_seen else None
+        # Sensor hat geliefert, aber nie Durchfluss gemessen (z. B. Pumpe aus): es floss kein Wasser.
+        dry = bool(self.flow_sensor) and self._flow_reported and not self._flow_seen
         self._start = None
         self._flow_since = None
         self.stuck_open = False
@@ -341,6 +346,8 @@ class IrrigationTracker:
                     liters, source = value, candidate_source
                     break
                 implausible = True
+            if liters is None and dry:
+                liters, source, implausible = 0.0, SOURCE_FLOW, False
             record = RunRecord(
                 start=start,
                 end=end,

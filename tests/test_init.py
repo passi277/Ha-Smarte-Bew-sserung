@@ -355,6 +355,29 @@ async def test_valve_open_without_flow(hass: HomeAssistant, mock_fetch, freezer:
     problem = hass.states.get(_eid(hass, "binary_sensor", "problem"))
     assert problem.state == "on"
     assert any("kein Durchfluss" in f for f in problem.attributes["faults"])
+    # Pumpe aus: es floss kein Wasser, also nichts gutschreiben
+    last_run = hass.states.get(_eid(hass, "sensor", "last_run_volume"))
+    assert float(last_run.state) == 0
+    assert last_run.attributes["measured"] is True
+    assert float(hass.states.get(_eid(hass, "sensor", "water_total")).state) == 0
+    assert hass.states.get(_eid(hass, "sensor", "measured_throughput")).state == "unknown"
+
+
+async def test_flow_sensor_unavailable_estimates(
+    hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory
+) -> None:
+    await _setup_zone(hass, mock_fetch, freezer, LAWN_FLOW)
+    hass.states.async_set("sensor.ventil_volleyball_flow", "unavailable")
+    await hass.async_block_till_done()
+    hass.states.async_set("switch.ventil_volleyball", "on")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=10))
+    hass.states.async_set("switch.ventil_volleyball", "off")
+    await hass.async_block_till_done()
+    # Ohne Messwerte wird aus Laufzeit × Durchsatz geschätzt: 10 min × 23 l/min
+    last_run = hass.states.get(_eid(hass, "sensor", "last_run_volume"))
+    assert float(last_run.state) == pytest.approx(230, abs=1)
+    assert last_run.attributes["measured"] is False
 
 
 async def test_flow_only_zone(hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory) -> None:

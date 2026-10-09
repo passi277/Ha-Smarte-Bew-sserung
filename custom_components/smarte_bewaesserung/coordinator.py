@@ -678,7 +678,7 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
         runs = zone.state["runs_by_date"]
         runs[key] = runs.get(key, 0) + 1
         zone.state["last_run"] = run.as_dict()
-        if run.measured and run.minutes >= 1:
+        if run.measured and run.minutes >= 1 and run.liters > 0:
             samples = zone.state["throughput_samples"]
             samples.append(round(run.liters / run.minutes, 2))
             del samples[:-THROUGHPUT_SAMPLES]
