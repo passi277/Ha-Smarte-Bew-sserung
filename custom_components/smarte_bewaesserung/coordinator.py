@@ -129,6 +129,8 @@ class ZoneSnapshot:
     learned_factor: float = 1.0
     learned_samples: int = 0
     learned_recent: list[dict[str, Any]] = field(default_factory=list)
+    area_m2: float = 0.0
+    throughput_lpm: float = 0.0
 
 
 @dataclass
@@ -897,6 +899,8 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
                 learned_factor=float(zone.learner.state["factor"]),
                 learned_samples=int(zone.learner.state["samples"]),
                 learned_recent=list(zone.learner.state["recent"]),
+                area_m2=params.area_m2,
+                throughput_lpm=params.throughput_lpm,
             )
         snap.season_status, snap.season_checklist = self._season_status(snap, now)
         snap.weekly = self.weekly_report()

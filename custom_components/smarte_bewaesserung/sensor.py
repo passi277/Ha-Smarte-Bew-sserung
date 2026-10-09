@@ -256,6 +256,13 @@ ZONE_SENSORS: tuple[ZoneSensorDescription, ...] = (
             "cycle_on_min": z.recommendation.cycles.on_min if z.recommendation.cycles else z.recommendation.minutes,
             "cycle_soak_min": z.recommendation.cycles.soak_min if z.recommendation.cycles else 0,
             "reason": z.recommendation.reason,
+            # Wie bei Smart Irrigation, damit Dashboard-Karten beide gleich lesen können:
+            # Wasserkonto negativ = es fehlt Wasser.
+            "bucket": -z.depletion_mm,
+            "threshold_mm": z.raw_mm,
+            "size": z.area_m2,
+            "throughput": z.throughput_lpm,
+            "multiplier": z.kc,
         },
     ),
     ZoneSensorDescription(

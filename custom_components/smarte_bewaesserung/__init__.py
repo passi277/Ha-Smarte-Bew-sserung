@@ -113,14 +113,16 @@ def _register_services(hass: HomeAssistant) -> None:
         coordinator.refresh_now()
 
     async def set_depletion(call: ServiceCall) -> None:
-        coordinator, zone = _resolve_zone(hass, call.data[ATTR_ENTITY_ID])
-        if ATTR_DEPLETION_MM in call.data:
-            value = call.data[ATTR_DEPLETION_MM]
-        elif ATTR_SOIL_WATER_PCT in call.data:
-            value = (1 - call.data[ATTR_SOIL_WATER_PCT] / 100) * zone.params.taw_mm
-        else:
+        if ATTR_DEPLETION_MM not in call.data and ATTR_SOIL_WATER_PCT not in call.data:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="depletion_or_pct")
-        coordinator.set_depletion(zone, value)
+        # Mehrere Zonen auf einmal möglich, z. B. „Konten auf 0“ im Dashboard.
+        for entity_id in call.data[ATTR_ENTITY_ID]:
+            coordinator, zone = _resolve_zone(hass, entity_id)
+            if ATTR_DEPLETION_MM in call.data:
+                value = call.data[ATTR_DEPLETION_MM]
+            else:
+                value = (1 - call.data[ATTR_SOIL_WATER_PCT] / 100) * zone.params.taw_mm
+            coordinator.set_depletion(zone, value)
 
     async def calibrate_soil_sensor(call: ServiceCall) -> dict:
         coordinator, zone = _resolve_zone(hass, call.data[ATTR_ENTITY_ID])
@@ -166,7 +168,7 @@ def _register_services(hass: HomeAssistant) -> None:
         set_depletion,
         schema=vol.Schema(
             {
-                **ZONE_TARGET,
+                vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
                 vol.Exclusive(ATTR_DEPLETION_MM, "value"): vol.All(vol.Coerce(float), vol.Range(min=0)),
                 vol.Exclusive(ATTR_SOIL_WATER_PCT, "value"): vol.All(vol.Coerce(float), vol.Range(min=0, max=100)),
             }

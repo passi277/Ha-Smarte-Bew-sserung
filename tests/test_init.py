@@ -525,3 +525,22 @@ async def test_demand_factor_learned_from_soil_sensor(
     assert float(learned.state) < 0.85
     depletion_state = hass.states.get(depletion)
     assert depletion_state.attributes["soil_calibration"] == "manual"
+
+
+async def test_reset_all_zones_and_bucket_attribute(hass: HomeAssistant, setup, freezer: FrozenDateTimeFactory) -> None:
+    duration = _eid(hass, "sensor", "recommended_duration")
+    depletion = _eid(hass, "sensor", "depletion")
+    coordinator = setup.runtime_data
+    zone = next(iter(coordinator.zones.values()))
+    coordinator.set_depletion(zone, 12)
+    await hass.async_block_till_done()
+    attrs = hass.states.get(duration).attributes
+    assert attrs["bucket"] == -12.0
+    assert attrs["size"] == 120
+    assert attrs["throughput"] == 17
+    assert attrs["threshold_mm"] == 15.0
+    # Mehrere Zonen in einem Aufruf (Liste)
+    await hass.services.async_call(
+        DOMAIN, "set_depletion", {"entity_id": [depletion], "depletion_mm": 0}, blocking=True
+    )
+    assert float(hass.states.get(depletion).state) == 0.0

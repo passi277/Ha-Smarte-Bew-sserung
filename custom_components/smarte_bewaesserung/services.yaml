@@ -29,6 +29,7 @@ set_depletion:
       selector:
         entity:
           integration: smarte_bewaesserung
+          multiple: true
     depletion_mm:
       selector:
         number:
