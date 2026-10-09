@@ -131,6 +131,9 @@ class ZoneSnapshot:
     learned_recent: list[dict[str, Any]] = field(default_factory=list)
     area_m2: float = 0.0
     throughput_lpm: float = 0.0
+    et0_today_mm: float | None = None
+    last_calculated: str | None = None
+    data_points: int = 0
 
 
 @dataclass
@@ -156,6 +159,9 @@ class Snapshot:
     season_status: str = STATUS_SEASON
     season_checklist: list[str] = field(default_factory=list)
     weekly: dict[str, Any] = field(default_factory=dict)
+    block_reason: str = ""
+    flow_report: str = ""
+    last_run_report: str = ""
     weather_updated: datetime | None = None
     zones: dict[str, ZoneSnapshot] = field(default_factory=dict)
 
@@ -846,6 +852,8 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
             ),
             weather_updated=self.weather_updated,
         )
+        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+        data_points = sum(1 for h in self.weather.hourly if midnight < h.time <= now.replace(tzinfo=None))
         for sub_id, zone in self.zones.items():
             kc, phase, phase_source = zone.season(today)
             params = replace(zone.params, kc=kc)
@@ -901,10 +909,34 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
                 learned_recent=list(zone.learner.state["recent"]),
                 area_m2=params.area_m2,
                 throughput_lpm=params.throughput_lpm,
+                et0_today_mm=snap.et0_today_mm,
+                last_calculated=dt_util.as_local(now).isoformat(timespec="seconds"),
+                data_points=data_points,
             )
         snap.season_status, snap.season_checklist = self._season_status(snap, now)
         snap.weekly = self.weekly_report()
+        first = next(iter(snap.zones.values()), None)
+        snap.block_reason = " · ".join(first.recommendation.blocked_by) if first else ""
+        snap.flow_report, snap.last_run_report = self._run_reports()
         return snap
+
+    def _run_reports(self) -> tuple[str, str]:
+        """Texte wie die bisherigen Helfer „gemessener Durchfluss“ und „letzter Lauf“."""
+        flows, runs, latest = [], [], None
+        for zone in self.zones.values():
+            samples = zone.state["throughput_samples"]
+            flows.append(f"{zone.name} {_de(samples[-1]) if samples else '?'} l/min")
+            last = zone.state.get("last_run")
+            if last:
+                start = dt_util.as_local(datetime.fromisoformat(last["start"]))
+                latest = max(latest, start) if latest else start
+                runs.append(f"{zone.name} {round(last['minutes'])} min/{round(last['liters'])} l")
+        if latest is None:
+            return "Gemessen: noch kein Lauf", "Noch kein Lauf erfasst"
+        stamp = latest.strftime("%d.%m.")
+        return f"Gemessen {stamp}: " + "; ".join(flows) + ";", f"{latest.strftime('%d.%m. %H:%M')}: " + "; ".join(
+            runs
+        ) + ";"
 
     def _ensemble_expected(self, now: datetime) -> float | None:
         if self.ensemble is None:

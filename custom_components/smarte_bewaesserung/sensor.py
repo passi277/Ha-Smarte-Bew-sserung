@@ -74,6 +74,18 @@ GLOBAL_SENSORS: tuple[GlobalSensorDescription, ...] = (
         attrs_fn=lambda s: {"checklist": s.season_checklist},
     ),
     GlobalSensorDescription(
+        key="block_reason",
+        value_fn=lambda s: s.block_reason[:255] or "–",
+    ),
+    GlobalSensorDescription(
+        key="flow_report",
+        value_fn=lambda s: s.flow_report[:255],
+    ),
+    GlobalSensorDescription(
+        key="last_run_report",
+        value_fn=lambda s: s.last_run_report[:255],
+    ),
+    GlobalSensorDescription(
         key="weekly_report",
         native_unit_of_measurement=UnitOfVolume.LITERS,
         value_fn=lambda s: s.weekly.get("total_liters"),
@@ -263,6 +275,10 @@ ZONE_SENSORS: tuple[ZoneSensorDescription, ...] = (
             "size": z.area_m2,
             "throughput": z.throughput_lpm,
             "multiplier": z.kc,
+            "maximum_bucket": z.taw_mm,
+            "eto": z.et0_today_mm,
+            "last_calculated": z.last_calculated,
+            "number_of_data_points": z.data_points,
         },
     ),
     ZoneSensorDescription(

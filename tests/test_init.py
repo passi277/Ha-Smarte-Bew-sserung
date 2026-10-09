@@ -544,3 +544,22 @@ async def test_reset_all_zones_and_bucket_attribute(hass: HomeAssistant, setup, 
         DOMAIN, "set_depletion", {"entity_id": [depletion], "depletion_mm": 0}, blocking=True
     )
     assert float(hass.states.get(depletion).state) == 0.0
+
+
+async def test_irrigation_card_attributes_and_reports(
+    hass: HomeAssistant, setup, mock_fetch, freezer: FrozenDateTimeFactory
+) -> None:
+    duration = hass.states.get(_eid(hass, "sensor", "recommended_duration"))
+    assert duration.attributes["maximum_bucket"] == 30.0
+    assert duration.attributes["eto"] == pytest.approx(5.0)
+    assert "number_of_data_points" in duration.attributes
+    assert duration.attributes["last_calculated"]
+    assert hass.states.get(_eid(hass, "sensor", "last_run_report")).state == "Noch kein Lauf erfasst"
+    assert hass.states.get(_eid(hass, "sensor", "block_reason")).state == "–"
+
+    await hass.services.async_call(
+        DOMAIN, "record_irrigation", {"entity_id": _eid(hass, "sensor", "depletion"), "liters": 170}, blocking=True
+    )
+    report = hass.states.get(_eid(hass, "sensor", "last_run_report")).state
+    assert "Haus 10 min/170 l;" in report
+    assert hass.states.get(_eid(hass, "sensor", "flow_report")).state.startswith("Gemessen ")

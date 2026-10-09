@@ -209,6 +209,15 @@
       "weekly_report": {
         "name": "Weekly report"
       },
+      "block_reason": {
+        "name": "Lock reason"
+      },
+      "flow_report": {
+        "name": "Flow report"
+      },
+      "last_run_report": {
+        "name": "Run report"
+      },
       "learned_factor": {
         "name": "Learned demand factor"
       },

@@ -209,6 +209,15 @@
       "weekly_report": {
         "name": "Wochenbericht"
       },
+      "block_reason": {
+        "name": "Sperrgrund"
+      },
+      "flow_report": {
+        "name": "Durchfluss-Bericht"
+      },
+      "last_run_report": {
+        "name": "Lauf-Bericht"
+      },
       "learned_factor": {
         "name": "Gelernter Bedarfsfaktor"
       },
