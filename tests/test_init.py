@@ -558,7 +558,10 @@ async def test_reset_all_zones_and_bucket_attribute(hass: HomeAssistant, setup, 
     coordinator.set_depletion(zone, 12)
     await hass.async_block_till_done()
     attrs = hass.states.get(duration).attributes
-    assert attrs["bucket"] == -12.0
+    assert attrs["bucket"] == 3.0
+    coordinator.set_depletion(zone, 20)
+    await hass.async_block_till_done()
+    assert hass.states.get(duration).attributes["bucket"] == -5.0
     assert attrs["size"] == 120
     assert attrs["throughput"] == 17
     assert attrs["threshold_mm"] == 15.0
@@ -573,7 +576,7 @@ async def test_irrigation_card_attributes_and_reports(
     hass: HomeAssistant, setup, mock_fetch, freezer: FrozenDateTimeFactory
 ) -> None:
     duration = hass.states.get(_eid(hass, "sensor", "recommended_duration"))
-    assert duration.attributes["maximum_bucket"] == 30.0
+    assert duration.attributes["maximum_bucket"] == 15.0
     assert duration.attributes["eto"] == pytest.approx(5.0)
     assert "number_of_data_points" in duration.attributes
     assert duration.attributes["last_calculated"]
