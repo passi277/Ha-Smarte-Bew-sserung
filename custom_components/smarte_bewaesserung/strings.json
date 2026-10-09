@@ -9,9 +9,13 @@
           "rain_skip_mm": "Skip when rain forecast (24 h) reaches",
           "frost_c": "Frost lock below",
           "wind_kmh": "Wind lock above",
-          "soil_sensor_weight": "Soil sensor weight (0 = model only, 1 = sensor only)"
+          "soil_sensor_weight": "Soil sensor weight (0 = model only, 1 = sensor only)",
+          "rain_probability_pct": "Skip from rain probability",
+          "water_price_eur_m3": "Water price (0 = hide)"
         },
         "data_description": {
+          "rain_probability_pct": "Probability (40 DWD ensemble runs) that at least the rain-lock amount falls within 24 h. Below, the expected rain is credited.",
+          "water_price_eur_m3": "For costs in the weekly report. Leave 0 for well or cistern.",
           "rain_sensor": "Rain amount (mm counter), rain rate (mm/h) or binary rain sensor. An amount counter replaces Open-Meteo rain.",
           "soil_sensor_weight": "At day close the depletion is blended from model and soil moisture sensor."
         }
@@ -30,9 +34,13 @@
           "rain_skip_mm": "Skip when rain forecast (24 h) reaches",
           "frost_c": "Frost lock below",
           "wind_kmh": "Wind lock above",
-          "soil_sensor_weight": "Soil sensor weight (0 = model only, 1 = sensor only)"
+          "soil_sensor_weight": "Soil sensor weight (0 = model only, 1 = sensor only)",
+          "rain_probability_pct": "Skip from rain probability",
+          "water_price_eur_m3": "Water price (0 = hide)"
         },
         "data_description": {
+          "rain_probability_pct": "Probability (40 DWD ensemble runs) that at least the rain-lock amount falls within 24 h. Below, the expected rain is credited.",
+          "water_price_eur_m3": "For costs in the weekly report. Leave 0 for well or cistern.",
           "rain_sensor": "Rain amount (mm counter), rain rate (mm/h) or binary rain sensor. An amount counter replaces Open-Meteo rain.",
           "soil_sensor_weight": "At day close the depletion is blended from model and soil moisture sensor."
         }
@@ -192,6 +200,18 @@
       "et0_so_far": {
         "name": "ET₀ so far today"
       },
+      "rain_probability": {
+        "name": "Rain probability 24 h"
+      },
+      "rain_expected_24h": {
+        "name": "Expected rain 24 h (ensemble)"
+      },
+      "weekly_report": {
+        "name": "Weekly report"
+      },
+      "learned_factor": {
+        "name": "Learned demand factor"
+      },
       "gts": {
         "name": "Grassland temperature sum"
       },
@@ -260,6 +280,16 @@
       },
       "min_temp_24h": {
         "name": "Minimum temperature 24 h"
+      },
+      "season_status": {
+        "name": "Season status",
+        "state": {
+          "season": "Season",
+          "resting": "Resting",
+          "winterize": "Winterize",
+          "winterized": "Winterized",
+          "prepare_spring": "Prepare season"
+        }
       },
       "season_phase": {
         "name": "Season phase",
@@ -343,6 +373,20 @@
         }
       }
     },
+    "set_winterized": {
+      "name": "Set winterized",
+      "description": "Mark the system as winterized (no recommendations) or release it for the season.",
+      "fields": {
+        "winterized": {
+          "name": "Winterized",
+          "description": "On = winterized, off = season."
+        }
+      }
+    },
+    "weekly_report": {
+      "name": "Weekly report",
+      "description": "Balance of the last 7 days per zone as response, e.g. for a notification."
+    },
     "calibrate_soil_sensor": {
       "name": "Calibrate soil sensor",
       "description": "Store the current reading as dry or wet.",
@@ -367,6 +411,9 @@
     },
     "depletion_or_pct": {
       "message": "Please provide depletion or soil water."
+    },
+    "not_loaded": {
+      "message": "Smart irrigation is not loaded."
     },
     "no_soil_value": {
       "message": "The soil moisture sensor has no value."

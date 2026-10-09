@@ -21,11 +21,15 @@ CONF_RAIN_SKIP_MM: Final = "rain_skip_mm"
 CONF_FROST_C: Final = "frost_c"
 CONF_WIND_KMH: Final = "wind_kmh"
 CONF_SOIL_SENSOR_WEIGHT: Final = "soil_sensor_weight"
+CONF_RAIN_PROBABILITY: Final = "rain_probability_pct"
+CONF_WATER_PRICE: Final = "water_price_eur_m3"
 
 DEFAULT_RAIN_SKIP_MM: Final = 3.0
 DEFAULT_FROST_C: Final = 4.0
 DEFAULT_WIND_KMH: Final = 30.0
 DEFAULT_SOIL_SENSOR_WEIGHT: Final = 0.5
+DEFAULT_RAIN_PROBABILITY: Final = 70.0
+DEFAULT_WATER_PRICE: Final = 0.0
 
 # Zone (Subentry)
 CONF_AREA: Final = "area_m2"
@@ -65,9 +69,23 @@ SERVICE_RECALCULATE: Final = "recalculate"
 SERVICE_RECORD_IRRIGATION: Final = "record_irrigation"
 SERVICE_SET_DEPLETION: Final = "set_depletion"
 SERVICE_CALIBRATE_SOIL_SENSOR: Final = "calibrate_soil_sensor"
+SERVICE_SET_WINTERIZED: Final = "set_winterized"
+SERVICE_WEEKLY_REPORT: Final = "weekly_report"
 
 ATTR_LITERS: Final = "liters"
 ATTR_MINUTES: Final = "minutes"
 ATTR_DEPLETION_MM: Final = "depletion_mm"
 ATTR_SOIL_WATER_PCT: Final = "soil_water_pct"
 ATTR_POINT: Final = "point"
+ATTR_WINTERIZED: Final = "winterized"
+
+# Saisonstatus der Anlage (Winter-Assistent)
+STATUS_SEASON: Final = "season"
+STATUS_RESTING: Final = "resting"
+STATUS_WINTERIZE: Final = "winterize"
+STATUS_WINTERIZED: Final = "winterized"
+STATUS_PREPARE_SPRING: Final = "prepare_spring"
+SEASON_STATUSES: Final = [STATUS_SEASON, STATUS_RESTING, STATUS_WINTERIZE, STATUS_WINTERIZED, STATUS_PREPARE_SPRING]
+# Frost, ab dem Leitungen und Ventile entleert sein sollten (Tiefstwert der nächsten 72 h).
+WINTER_FROST_C: Final = 0.0
+ENSEMBLE_MAX_AGE: Final = timedelta(hours=6)

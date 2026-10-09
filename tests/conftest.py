@@ -55,3 +55,24 @@ def mock_daily_means():
     """Archivabruf der Tagesmittel ersetzen (Standard: keine Daten → Kalender)."""
     with patch("custom_components.smarte_bewaesserung.coordinator.async_fetch_daily_means", return_value={}) as mock:
         yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_ensemble():
+    """Ensemble-Abruf ersetzen (Standard: nicht erreichbar → normale Vorhersage)."""
+    from custom_components.smarte_bewaesserung.open_meteo import OpenMeteoError
+
+    with patch(
+        "custom_components.smarte_bewaesserung.coordinator.async_fetch_ensemble",
+        side_effect=OpenMeteoError("kein Netz im Test"),
+    ) as mock:
+        yield mock
+
+
+def make_ensemble(today: date, member_rain_per_hour: list[float]):
+    """Ensemble mit einem Lauf je Eintrag (konstanter Regen pro Stunde)."""
+    from custom_components.smarte_bewaesserung.open_meteo import EnsembleRain
+
+    start = datetime.combine(today, datetime.min.time())
+    times = [start + timedelta(hours=h) for h in range(1, 73)]
+    return EnsembleRain(times, [[r] * len(times) for r in member_rain_per_hour])

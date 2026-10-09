@@ -424,3 +424,104 @@ async def test_weather_based_season(
     assert phase.attributes["source"] == "weather"
     assert float(hass.states.get(_eid(hass, "sensor", "kc")).state) == pytest.approx(0.2)
     assert float(hass.states.get(_eid(hass, "sensor", "gts")).state) > 2000
+
+
+async def test_ensemble_rain_probability(
+    hass: HomeAssistant, mock_fetch, mock_ensemble, freezer: FrozenDateTimeFactory
+) -> None:
+    from .conftest import make_ensemble
+
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    freezer.move_to("2026-07-10 00:00:00+02:00")
+    today = dt_util.now().date()
+    mock_fetch.return_value = make_weather(today, et0=5.0, forecast_rain_per_hour=0.5)  # 12 mm angesagt
+    # 10 Läufe: 3 mit kräftigem Regen (0,5 mm/h), 7 trocken → 30 %
+    mock_ensemble.side_effect = None
+    mock_ensemble.return_value = make_ensemble(today, [0.5] * 3 + [0.0] * 7)
+    hass.states.async_set(VALVE, "off")
+    entry = _entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert float(hass.states.get(_eid(hass, "sensor", "rain_probability")).state) == 30
+    assert float(hass.states.get(_eid(hass, "sensor", "rain_expected_24h")).state) == pytest.approx(3.6)
+    # Trotz 12 mm in der Einzelvorhersage keine Sperre, weil nur 30 % wahrscheinlich
+    assert hass.states.get(_eid(hass, "binary_sensor", "rain_block")).state == "off"
+
+
+async def test_winter_assistant(hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory) -> None:
+    zone = {**ZONE_DATA, CONF_PLANT: "lawn"}
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    freezer.move_to("2026-12-01 10:00:00+01:00")
+    mock_fetch.return_value = make_weather(dt_util.now().date(), et0=0.3, temp=-2.0)
+    hass.states.async_set(VALVE, "off")
+    entry = _entry(zone=zone)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    status = hass.states.get(_eid(hass, "sensor", "season_status"))
+    assert status.state == "winterize"
+    assert any("entleeren" in item for item in status.attributes["checklist"])
+    from homeassistant.components.persistent_notification import _async_get_or_create_notifications
+
+    notification = _async_get_or_create_notifications(hass)["smarte_bewaesserung_season"]
+    assert notification["title"] == "Bewässerung winterfest machen"
+    assert "Batterien" in notification["message"]
+
+    await hass.services.async_call(DOMAIN, "set_winterized", {"winterized": True}, blocking=True)
+    assert hass.states.get(_eid(hass, "sensor", "season_status")).state == "winterized"
+    coordinator = entry.runtime_data
+    zone_obj = next(iter(coordinator.zones.values()))
+    coordinator.set_depletion(zone_obj, 25)
+    reason = hass.states.get(_eid(hass, "sensor", "reason")).state
+    assert "winterfest" in reason
+
+
+async def test_weekly_report(hass: HomeAssistant, setup, mock_fetch, freezer: FrozenDateTimeFactory) -> None:
+    depletion = _eid(hass, "sensor", "depletion")
+    await hass.services.async_call(DOMAIN, "record_irrigation", {"entity_id": depletion, "liters": 340}, blocking=True)
+    for _ in range(2):
+        freezer.tick(timedelta(days=1))
+        mock_fetch.return_value = make_weather(dt_util.now().date(), et0=5.0)
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+
+    report = await hass.services.async_call(DOMAIN, "weekly_report", {}, blocking=True, return_response=True)
+    haus = report["zones"]["Haus"]
+    assert haus["liters"] == 340
+    assert haus["runs"] == 1
+    assert haus["use_mm"] == pytest.approx(8.0)
+    assert haus["days"] == 2
+    assert "Haus: 340 l in 1 Läufen" in report["text"]
+    sensor = hass.states.get(_eid(hass, "sensor", "weekly_report"))
+    assert float(sensor.state) == 340
+
+
+async def test_demand_factor_learned_from_soil_sensor(
+    hass: HomeAssistant, setup, mock_fetch, freezer: FrozenDateTimeFactory
+) -> None:
+    depletion = _eid(hass, "sensor", "depletion")
+    # Sensor kalibrieren: 10 % trocken, 40 % nass → TAW 30 mm entspricht 30 Prozentpunkten
+    for value, point in ((10, "dry"), (40, "wet")):
+        hass.states.async_set(SOIL, str(value), {"unit_of_measurement": "%"})
+        await hass.services.async_call(
+            DOMAIN, "calibrate_soil_sensor", {"entity_id": depletion, "point": point}, blocking=True
+        )
+    # Täglich trocknet der Boden laut Sensor nur 2 mm statt der berechneten 4 mm aus
+    moisture = 30.0
+    for _ in range(5):
+        hass.states.async_set(SOIL, str(moisture), {"unit_of_measurement": "%"})
+        freezer.tick(timedelta(days=1))
+        mock_fetch.return_value = make_weather(dt_util.now().date(), et0=5.0)
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+        moisture -= 2
+
+    learned = hass.states.get(_eid(hass, "sensor", "learned_factor"))
+    assert learned.attributes["learning_days"] == 4
+    assert learned.attributes["active"] is True
+    assert float(learned.state) < 0.85
+    depletion_state = hass.states.get(depletion)
+    assert depletion_state.attributes["soil_calibration"] == "manual"

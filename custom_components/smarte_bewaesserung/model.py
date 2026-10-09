@@ -30,6 +30,18 @@ IRRIGATION_EFFICIENCY: dict[str, float] = {
     "drip": 0.9,
 }
 
+# Versickerungsrate gesättigter Böden in mm/h (Richtwerte für Bewässerungsplanung).
+SOIL_INFILTRATION_MM_H: dict[str, float] = {
+    "sand": 25.0,
+    "loamy_sand": 20.0,
+    "sandy_loam": 15.0,
+    "loam": 12.0,
+    "silt_loam": 10.0,
+    "clay": 5.0,
+}
+# So viel Wasser darf auf ebener Fläche kurz stehen, bevor es abläuft (mm).
+SURFACE_STORAGE_MM = 3.0
+
 # Niederschlag, der an Blättern/Oberfläche hängen bleibt und direkt verdunstet (mm/Tag).
 RAIN_INTERCEPTION_MM = 0.5
 # Davon abgesehen kommt nur dieser Anteil in der Wurzelzone an (Abfluss, Verdunstung).
@@ -65,6 +77,16 @@ class ZoneParams:
     def efficiency(self) -> float:
         """Wirkungsgrad der Bewässerungsart."""
         return IRRIGATION_EFFICIENCY.get(self.irrigation_type, 0.75)
+
+    @property
+    def gross_rate_mm_h(self) -> float:
+        """Ausgebrachte Wasserhöhe pro Stunde, bevor Verluste abgezogen sind."""
+        return self.throughput_lpm * 60 / self.area_m2
+
+    @property
+    def infiltration_mm_h(self) -> float:
+        """Wie schnell der Boden Wasser aufnimmt."""
+        return SOIL_INFILTRATION_MM_H.get(self.soil_type, 12.0)
 
     @property
     def application_rate_mm_per_min(self) -> float:
@@ -149,6 +171,10 @@ class Conditions:
     min_temp_24h_c: float | None = None
     wind_kmh: float | None = None
     raining_now: bool = False
+    # Aus der Ensemble-Vorhersage: Wahrscheinlichkeit für Regen ≥ Regensperre und erwarteter wirksamer Regen.
+    rain_probability: float | None = None
+    rain_expected_effective_mm: float | None = None
+    winterized: bool = False
 
 
 @dataclass(frozen=True)
@@ -158,6 +184,33 @@ class Thresholds:
     rain_skip_mm: float = 3.0
     frost_c: float = 4.0
     wind_kmh: float = 30.0
+    rain_probability: float = 0.7
+
+
+@dataclass(frozen=True)
+class CyclePlan:
+    """Aufteilung eines Laufs, damit kein Wasser oberflächlich abläuft."""
+
+    cycles: int
+    on_min: int
+    soak_min: int
+
+    def describe(self) -> str:
+        return f"{self.cycles} × {self.on_min} min, je {self.soak_min} min Pause"
+
+
+def cycle_plan(params: ZoneParams, minutes: int) -> CyclePlan | None:
+    """Intervalle, wenn die Zone schneller wässert, als der Boden aufnimmt."""
+    excess_per_min = (params.gross_rate_mm_h - params.infiltration_mm_h) / 60
+    if minutes <= 0 or excess_per_min <= 0:
+        return None
+    max_on = max(1, math.floor(SURFACE_STORAGE_MM / excess_per_min))
+    if minutes <= max_on:
+        return None
+    cycles = math.ceil(minutes / max_on)
+    on_min = math.ceil(minutes / cycles)
+    soak_min = math.ceil(SURFACE_STORAGE_MM / params.infiltration_mm_h * 60)
+    return CyclePlan(cycles, on_min, soak_min)
 
 
 @dataclass
@@ -171,6 +224,7 @@ class Recommendation:
     reason: str
     blocked_by: list[str] = field(default_factory=list)
     capped: bool = False
+    cycles: CyclePlan | None = None
 
 
 def _fmt(value: float) -> str:
@@ -185,9 +239,15 @@ def recommend(
 ) -> Recommendation:
     """Entscheiden, ob und wie lange heute gegossen werden sollte."""
     blocked: list[str] = []
+    if conditions.winterized:
+        blocked.append("Anlage ist winterfest")
     if conditions.raining_now:
         blocked.append("Regensensor meldet Regen")
-    if conditions.rain_forecast_24h_mm >= thresholds.rain_skip_mm:
+    probability = conditions.rain_probability
+    if probability is not None:
+        if probability >= thresholds.rain_probability:
+            blocked.append(f"{probability * 100:.0f} % Chance auf ≥ {_fmt(thresholds.rain_skip_mm)} mm Regen")
+    elif conditions.rain_forecast_24h_mm >= thresholds.rain_skip_mm:
         blocked.append(f"{_fmt(conditions.rain_forecast_24h_mm)} mm Regen angesagt")
     if conditions.min_temp_24h_c is not None and conditions.min_temp_24h_c < thresholds.frost_c:
         blocked.append(f"Frostgefahr ({_fmt(conditions.min_temp_24h_c)} °C)")
@@ -203,7 +263,10 @@ def recommend(
         return Recommendation(False, 0.0, 0, 0, f"{deficit}, aber gesperrt: {', '.join(blocked)}", blocked)
 
     # Erwarteten Regen anrechnen und zurück auf Feldkapazität auffüllen.
-    rain_credit = effective_rain(conditions.rain_forecast_24h_mm)
+    if conditions.rain_expected_effective_mm is not None:
+        rain_credit = conditions.rain_expected_effective_mm
+    else:
+        rain_credit = effective_rain(conditions.rain_forecast_24h_mm)
     target = max(depletion_mm - rain_credit, 0.0)
     minutes_exact = target / params.application_rate_mm_per_min
     capped = minutes_exact > params.max_duration_min
@@ -221,8 +284,12 @@ def recommend(
     liters = round(minutes * params.throughput_lpm)
     reason = f"{deficit}"
     if rain_credit > 0:
-        reason += f", {_fmt(rain_credit)} mm Regen angerechnet"
+        chance = f" ({probability * 100:.0f} % Regenchance)" if probability is not None else ""
+        reason += f", {_fmt(rain_credit)} mm erwarteter Regen angerechnet{chance}"
     reason += f" → {minutes} min / {liters} l"
     if capped:
         reason += f" (auf {params.max_duration_min:.0f} min gekappt)"
-    return Recommendation(True, target, minutes, liters, reason, blocked, capped)
+    cycles = cycle_plan(params, minutes)
+    if cycles:
+        reason += f", in Intervallen: {cycles.describe()}"
+    return Recommendation(True, target, minutes, liters, reason, blocked, capped, cycles)

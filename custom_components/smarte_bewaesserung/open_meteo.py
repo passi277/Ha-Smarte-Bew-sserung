@@ -10,6 +10,9 @@ import aiohttp
 
 API_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
+ENSEMBLE_URL = "https://ensemble-api.open-meteo.com/v1/ensemble"
+# DWD ICON-Ensemble (40 Läufe), für Deutschland am besten geeignet.
+ENSEMBLE_MODEL = "icon_seamless"
 PAST_DAYS = 7
 FORECAST_DAYS = 3
 TIMEOUT = aiohttp.ClientTimeout(total=30)
@@ -194,3 +197,56 @@ async def async_fetch_daily_means(
         }
     except (TimeoutError, aiohttp.ClientError, KeyError, TypeError, ValueError) as err:
         raise OpenMeteoError(f"Open-Meteo-Archiv nicht erreichbar: {err}") from err
+
+
+@dataclass
+class EnsembleRain:
+    """Stündlicher Regen aller Ensemble-Läufe (Mengen gelten für die Stunde vor `times[i]`)."""
+
+    times: list[datetime]
+    members: list[list[float]]
+
+    def member_sums(self, now: datetime, hours: float = 24) -> list[float]:
+        """Regensumme der nächsten Stunden je Ensemble-Lauf (angeschnittene Stunden anteilig)."""
+        now = now.replace(tzinfo=None)
+        end = now + timedelta(hours=hours)
+        weights = [max(0.0, (min(t, end) - max(t - HOUR, now)).total_seconds() / 3600) for t in self.times]
+        return [sum(v * w for v, w in zip(member, weights, strict=True)) for member in self.members]
+
+
+def parse_ensemble(payload: dict[str, Any]) -> EnsembleRain:
+    """Ensemble-Antwort lesen; jede Spalte „precipitation…“ ist ein Lauf."""
+    try:
+        hourly = payload["hourly"]
+        times = [datetime.fromisoformat(t) for t in hourly["time"]]
+        members = [
+            [float(v) if v is not None else 0.0 for v in values]
+            for key, values in hourly.items()
+            if key.startswith("precipitation")
+        ]
+    except (KeyError, TypeError, ValueError) as err:
+        raise OpenMeteoError(f"Unerwartete Ensemble-Antwort: {err}") from err
+    if not members:
+        raise OpenMeteoError("Ensemble-Antwort ohne Regenwerte")
+    return EnsembleRain(times, members)
+
+
+async def async_fetch_ensemble(
+    session: aiohttp.ClientSession, latitude: float, longitude: float, timezone: str
+) -> EnsembleRain:
+    """Regen-Ensemble für die nächsten Tage laden."""
+    params = {
+        "latitude": f"{latitude:.4f}",
+        "longitude": f"{longitude:.4f}",
+        "hourly": "precipitation",
+        "models": ENSEMBLE_MODEL,
+        "forecast_days": "3",
+        "timezone": timezone,
+    }
+    try:
+        async with session.get(ENSEMBLE_URL, params=params, timeout=TIMEOUT) as resp:
+            resp.raise_for_status()
+            payload = await resp.json()
+    except (TimeoutError, aiohttp.ClientError) as err:
+        raise OpenMeteoError(f"Open-Meteo-Ensemble nicht erreichbar: {err}") from err
+    return parse_ensemble(payload)

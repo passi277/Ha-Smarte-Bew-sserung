@@ -3,11 +3,11 @@
   "name": "Smarte Bewässerung",
   "codeowners": ["@passi277"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["persistent_notification"],
   "documentation": "https://github.com/passi277/Ha-Smarte-Bew-sserung",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/passi277/Ha-Smarte-Bew-sserung/issues",
   "requirements": [],
-  "version": "0.3.0"
+  "version": "0.4.0"
 }

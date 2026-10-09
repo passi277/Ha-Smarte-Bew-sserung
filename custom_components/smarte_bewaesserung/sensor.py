@@ -24,9 +24,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import SmarteBewaesserungConfigEntry
-from .const import CONF_COMPARE_ENTITY
+from .const import CONF_COMPARE_ENTITY, SEASON_STATUSES
 from .coordinator import Snapshot, ZoneSnapshot
 from .entity import GlobalEntity, ZoneEntity
+from .learning import LEARN_MIN_SAMPLES
 from .plants import PHASE_DORMANT, PHASE_GROWTH, PHASE_PEAK, PHASE_RIPENING, PHASE_SPROUTING
 
 MM = UnitOfPrecipitationDepth.MILLIMETERS
@@ -51,6 +52,33 @@ class ZoneSensorDescription(SensorEntityDescription):
 
 
 GLOBAL_SENSORS: tuple[GlobalSensorDescription, ...] = (
+    GlobalSensorDescription(
+        key="rain_probability",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda s: s.rain_probability_pct,
+    ),
+    GlobalSensorDescription(
+        key="rain_expected_24h",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit_of_measurement=MM,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda s: s.rain_expected_24h_mm,
+    ),
+    GlobalSensorDescription(
+        key="season_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=SEASON_STATUSES,
+        value_fn=lambda s: s.season_status,
+        attrs_fn=lambda s: {"checklist": s.season_checklist},
+    ),
+    GlobalSensorDescription(
+        key="weekly_report",
+        native_unit_of_measurement=UnitOfVolume.LITERS,
+        value_fn=lambda s: s.weekly.get("total_liters"),
+        attrs_fn=lambda s: {k: v for k, v in s.weekly.items() if k != "total_liters"},
+    ),
     GlobalSensorDescription(
         key="gts",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -128,6 +156,9 @@ ZONE_SENSORS: tuple[ZoneSensorDescription, ...] = (
         value_fn=lambda z: z.depletion_mm,
         attrs_fn=lambda z: {
             "depletion_at_day_start_mm": z.committed_depletion_mm,
+            "soil_wet_pct": z.soil_wet_pct,
+            "soil_dry_pct": z.soil_dry_pct,
+            "soil_calibration": z.soil_calibration,
             "taw_mm": z.taw_mm,
             "raw_mm": z.raw_mm,
             "soil_sensor_depletion_mm": z.sensor_depletion_mm,
@@ -172,6 +203,17 @@ ZONE_SENSORS: tuple[ZoneSensorDescription, ...] = (
         value_fn=lambda z: z.etc_7d_mm,
     ),
     ZoneSensorDescription(
+        key="learned_factor",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda z: z.learned_factor,
+        attrs_fn=lambda z: {
+            "learning_days": z.learned_samples,
+            "active": z.learned_samples >= LEARN_MIN_SAMPLES,
+            "recent": z.learned_recent,
+        },
+    ),
+    ZoneSensorDescription(
         key="kc",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
@@ -210,6 +252,9 @@ ZONE_SENSORS: tuple[ZoneSensorDescription, ...] = (
             "target_mm": round(z.recommendation.target_mm, 1),
             "capped": z.recommendation.capped,
             "blocked_by": z.recommendation.blocked_by,
+            "cycles": z.recommendation.cycles.cycles if z.recommendation.cycles else 1,
+            "cycle_on_min": z.recommendation.cycles.on_min if z.recommendation.cycles else z.recommendation.minutes,
+            "cycle_soak_min": z.recommendation.cycles.soak_min if z.recommendation.cycles else 0,
             "reason": z.recommendation.reason,
         },
     ),

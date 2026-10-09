@@ -59,3 +59,13 @@ calibrate_soil_sensor:
           options:
             - dry
             - wet
+
+set_winterized:
+  fields:
+    winterized:
+      required: true
+      default: true
+      selector:
+        boolean:
+
+weekly_report:

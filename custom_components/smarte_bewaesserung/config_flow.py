@@ -29,6 +29,7 @@ from .const import (
     CONF_MAX_DURATION,
     CONF_MIN_DURATION,
     CONF_PLANT,
+    CONF_RAIN_PROBABILITY,
     CONF_RAIN_SENSOR,
     CONF_RAIN_SKIP_MM,
     CONF_ROOT_DEPTH,
@@ -40,12 +41,15 @@ from .const import (
     CONF_THROUGHPUT,
     CONF_VALVE,
     CONF_VOLUME_SENSOR,
+    CONF_WATER_PRICE,
     CONF_WIND_KMH,
     DEFAULT_FROST_C,
+    DEFAULT_RAIN_PROBABILITY,
     DEFAULT_RAIN_SKIP_MM,
     DEFAULT_SOIL_DRY_PCT,
     DEFAULT_SOIL_SENSOR_WEIGHT,
     DEFAULT_SOIL_WET_PCT,
+    DEFAULT_WATER_PRICE,
     DEFAULT_WIND_KMH,
     DOMAIN,
     IRRIGATION_TYPES,
@@ -82,6 +86,8 @@ SETTINGS_SCHEMA = vol.Schema(
         vol.Required(CONF_FROST_C, default=DEFAULT_FROST_C): _number(-10, 15, 0.5, "°C"),
         vol.Required(CONF_WIND_KMH, default=DEFAULT_WIND_KMH): _number(0, 150, 1, "km/h"),
         vol.Required(CONF_SOIL_SENSOR_WEIGHT, default=DEFAULT_SOIL_SENSOR_WEIGHT): _number(0, 1, 0.1),
+        vol.Required(CONF_RAIN_PROBABILITY, default=DEFAULT_RAIN_PROBABILITY): _number(10, 100, 5, "%"),
+        vol.Required(CONF_WATER_PRICE, default=DEFAULT_WATER_PRICE): _number(0, 20, 0.01, "€/m³"),
     }
 )
 

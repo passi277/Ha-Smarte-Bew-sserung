@@ -9,9 +9,13 @@
           "rain_skip_mm": "Nicht gießen ab Regenvorhersage (24 h)",
           "frost_c": "Frostsperre unter",
           "wind_kmh": "Windsperre über",
-          "soil_sensor_weight": "Gewicht Bodenfeuchtesensor (0 = nur Modell, 1 = nur Sensor)"
+          "soil_sensor_weight": "Gewicht Bodenfeuchtesensor (0 = nur Modell, 1 = nur Sensor)",
+          "rain_probability_pct": "Nicht gießen ab Regenwahrscheinlichkeit",
+          "water_price_eur_m3": "Wasserpreis (0 = nicht anzeigen)"
         },
         "data_description": {
+          "rain_probability_pct": "Wahrscheinlichkeit (aus 40 DWD-Ensembleläufen), dass in 24 h mindestens die Regensperre-Menge fällt. Darunter wird der erwartete Regen angerechnet.",
+          "water_price_eur_m3": "Für die Kosten im Wochenbericht. Bei Brunnen oder Zisterne 0 lassen.",
           "rain_sensor": "Regenmenge (mm-Zähler), Regenintensität (mm/h) oder binärer Regensensor. Ein Mengenzähler ersetzt den Open-Meteo-Regen.",
           "soil_sensor_weight": "Beim Tagesabschluss wird die Erschöpfung aus Modell und Bodenfeuchtesensor gemischt."
         }
@@ -30,9 +34,13 @@
           "rain_skip_mm": "Nicht gießen ab Regenvorhersage (24 h)",
           "frost_c": "Frostsperre unter",
           "wind_kmh": "Windsperre über",
-          "soil_sensor_weight": "Gewicht Bodenfeuchtesensor (0 = nur Modell, 1 = nur Sensor)"
+          "soil_sensor_weight": "Gewicht Bodenfeuchtesensor (0 = nur Modell, 1 = nur Sensor)",
+          "rain_probability_pct": "Nicht gießen ab Regenwahrscheinlichkeit",
+          "water_price_eur_m3": "Wasserpreis (0 = nicht anzeigen)"
         },
         "data_description": {
+          "rain_probability_pct": "Wahrscheinlichkeit (aus 40 DWD-Ensembleläufen), dass in 24 h mindestens die Regensperre-Menge fällt. Darunter wird der erwartete Regen angerechnet.",
+          "water_price_eur_m3": "Für die Kosten im Wochenbericht. Bei Brunnen oder Zisterne 0 lassen.",
           "rain_sensor": "Regenmenge (mm-Zähler), Regenintensität (mm/h) oder binärer Regensensor. Ein Mengenzähler ersetzt den Open-Meteo-Regen.",
           "soil_sensor_weight": "Beim Tagesabschluss wird die Erschöpfung aus Modell und Bodenfeuchtesensor gemischt."
         }
@@ -192,6 +200,18 @@
       "et0_so_far": {
         "name": "ET₀ bisher heute"
       },
+      "rain_probability": {
+        "name": "Regenwahrscheinlichkeit 24 h"
+      },
+      "rain_expected_24h": {
+        "name": "Regen erwartet 24 h (Ensemble)"
+      },
+      "weekly_report": {
+        "name": "Wochenbericht"
+      },
+      "learned_factor": {
+        "name": "Gelernter Bedarfsfaktor"
+      },
       "gts": {
         "name": "Grünlandtemperatursumme"
       },
@@ -260,6 +280,16 @@
       },
       "min_temp_24h": {
         "name": "Tiefsttemperatur 24 h"
+      },
+      "season_status": {
+        "name": "Saisonstatus",
+        "state": {
+          "season": "Saison",
+          "resting": "Ruhe",
+          "winterize": "Winterfest machen",
+          "winterized": "Winterfest",
+          "prepare_spring": "Saisonstart vorbereiten"
+        }
       },
       "season_phase": {
         "name": "Saisonphase",
@@ -343,6 +373,20 @@
         }
       }
     },
+    "set_winterized": {
+      "name": "Winterfest setzen",
+      "description": "Anlage als winterfest markieren (keine Gießempfehlungen) oder für die Saison freigeben.",
+      "fields": {
+        "winterized": {
+          "name": "Winterfest",
+          "description": "An = winterfest, aus = Saison."
+        }
+      }
+    },
+    "weekly_report": {
+      "name": "Wochenbericht",
+      "description": "Bilanz der letzten 7 Tage je Zone als Antwort, z. B. für eine Benachrichtigung."
+    },
     "calibrate_soil_sensor": {
       "name": "Bodenfeuchtesensor kalibrieren",
       "description": "Aktuellen Messwert als trocken oder nass speichern.",
@@ -367,6 +411,9 @@
     },
     "depletion_or_pct": {
       "message": "Bitte Erschöpfung oder Bodenwasser angeben."
+    },
+    "not_loaded": {
+      "message": "Smarte Bewässerung ist nicht geladen."
     },
     "no_soil_value": {
       "message": "Der Bodenfeuchtesensor liefert gerade keinen Wert."

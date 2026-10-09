@@ -19,11 +19,14 @@ from .const import (
     ATTR_MINUTES,
     ATTR_POINT,
     ATTR_SOIL_WATER_PCT,
+    ATTR_WINTERIZED,
     DOMAIN,
     SERVICE_CALIBRATE_SOIL_SENSOR,
     SERVICE_RECALCULATE,
     SERVICE_RECORD_IRRIGATION,
     SERVICE_SET_DEPLETION,
+    SERVICE_SET_WINTERIZED,
+    SERVICE_WEEKLY_REPORT,
 )
 from .coordinator import SmarteBewaesserungCoordinator, Zone
 from .irrigation_tracker import RunRecord
@@ -127,7 +130,24 @@ def _register_services(hass: HomeAssistant) -> None:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_soil_value") from err
         return {"point": call.data[ATTR_POINT], "moisture_pct": value}
 
+    async def set_winterized(call: ServiceCall) -> None:
+        for entry in hass.config_entries.async_loaded_entries(DOMAIN):
+            entry.runtime_data.set_winterized(call.data[ATTR_WINTERIZED])
+
+    async def weekly_report(call: ServiceCall) -> dict:
+        entries = hass.config_entries.async_loaded_entries(DOMAIN)
+        if not entries:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
+        return entries[0].runtime_data.weekly_report()
+
     hass.services.async_register(DOMAIN, SERVICE_RECALCULATE, recalculate)
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_WINTERIZED,
+        set_winterized,
+        schema=vol.Schema({vol.Required(ATTR_WINTERIZED): cv.boolean}),
+    )
+    hass.services.async_register(DOMAIN, SERVICE_WEEKLY_REPORT, weekly_report, supports_response=SupportsResponse.ONLY)
     hass.services.async_register(
         DOMAIN,
         SERVICE_RECORD_IRRIGATION,

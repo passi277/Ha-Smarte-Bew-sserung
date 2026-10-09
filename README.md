@@ -130,7 +130,7 @@ eingestellten Durchsatz.
 
 ## Entities
 
-**Gerät „Smarte Bewässerung“:** Grünlandtemperatursumme, ET₀ heute/gestern, Regen heute/gestern (mit Quelle), Regenvorhersage 24 h,
+**Gerät „Smarte Bewässerung“:** Saisonstatus, Wochenbericht, Regenwahrscheinlichkeit, Grünlandtemperatursumme, ET₀ heute/gestern, Regen heute/gestern (mit Quelle), Regenvorhersage 24 h,
 Tiefsttemperatur 24 h, Frostgefahr, Regensperre.
 
 **Je Zone:**
@@ -170,6 +170,8 @@ Während eines Laufs sinkt die Erschöpfung live mit. Am Abend steigt sie mit de
 | `smarte_bewaesserung.record_irrigation` | Lauf ohne Ventil eintragen (Liter oder Minuten) |
 | `smarte_bewaesserung.set_depletion` | Wasserkonto setzen (mm oder % Bodenwasser) |
 | `smarte_bewaesserung.calibrate_soil_sensor` | aktuellen Bodenfeuchtewert als „trocken“ oder „nass“ speichern |
+| `smarte_bewaesserung.set_winterized` | Anlage winterfest markieren bzw. wieder freigeben |
+| `smarte_bewaesserung.weekly_report` | Wochenbilanz als Antwort (Text und Zahlen je Zone) |
 
 Für `entity_id` reicht eine beliebige Entity der Zone, z. B. ihr Sensor „Erschöpfung“.
 
@@ -200,12 +202,84 @@ Empfehlung:
 Beim ersten Start beginnt das Wasserkonto bei 0 (Boden voll). Bei Trockenheit setzt du es mit `set_depletion` auf
 einen realistischen Wert.
 
-## Bodenfeuchtesensor kalibrieren
+## Gießen in Intervallen
 
+Wenn eine Zone schneller wässert, als der Boden das Wasser aufnimmt, läuft ein Teil oberflächlich weg. Die
+Integration vergleicht dafür die Wassermenge pro Stunde (Durchsatz ÷ Fläche) mit der Versickerung der Bodenart:
+
+| Boden | Sand | lehm. Sand | sand. Lehm | Lehm / Muttererde | schluff. Lehm | Ton |
+|---|---|---|---|---|---|---|
+| Versickerung (mm/h) | 25 | 20 | 15 | 12 | 10 | 5 |
+
+Bis etwa 3 mm Wasser darf kurz an der Oberfläche stehen. Liegt die Zone darüber, schlägt die Empfehlung
+Intervalle vor. Die Bananen bekommen mit 20 l/min auf 15 m² rund 80 mm pro Stunde. Ein Lauf von 10 min wird
+deshalb zu **5 × 2 min mit je 15 min Pause**. Der Plan steht im Text der Begründung und in den Attributen
+`cycles`, `cycle_on_min` und `cycle_soak_min` des Sensors „Empfohlene Dauer“.
+
+## Bodenfeuchtesensor: Kalibrierung und Lernen
+
+**Selbstkalibrierung** (läuft automatisch, sobald ein Sensor eingetragen ist):
+- **Nass (Feldkapazität):** Nach Regen oder Gießen steigt der Messwert, fällt dann schnell, während das
+  Sickerwasser abfließt, und pendelt sich ein. Der Wert 24 Stunden nach dem letzten Anstieg zählt als
+  Feldkapazität; verwendet wird der Median der letzten 5 solchen Werte.
+- **Trocken:** Der eingestellte Wert, oder der niedrigste je gemessene, falls der darunter liegt. Aussetzer
+  mit 0 % werden ignoriert.
+- Von Hand kalibrierte Werte (Service `calibrate_soil_sensor`) haben Vorrang. Das Attribut
+  `soil_calibration` am Sensor „Erschöpfung“ zeigt, welche Werte gerade gelten: `manual`, `learned` oder
+  `configured`.
+
+**Bedarf lernen** (Sensor „Gelernter Bedarfsfaktor“):
+- An trockenen Tagen (kein Regen, nicht gegossen, auch am Vortag nicht) vergleicht die Integration, wie stark
+  der Boden laut Sensor austrocknet, mit dem berechneten Verbrauch.
+- Trocknet die Zone langsamer aus, zum Beispiel wegen Schatten, sinkt der Faktor; trocknet sie schneller aus,
+  steigt er. Er bewegt sich um höchstens 15 % des Unterschieds pro Tag und bleibt zwischen 0,5 und 1,5.
+- Er wirkt erst nach 3 Lerntagen und nur bei kalibriertem Sensor (von Hand oder gelernt).
+
+Manuelle Kalibrierung, falls du nicht warten willst:
 1. An einem trockenen Tag vor dem Gießen `calibrate_soil_sensor` mit `point: dry` aufrufen.
 2. Etwa einen Tag nach kräftigem Gießen oder Regen `point: wet` aufrufen.
 
-Bis dahin gelten die Werte aus der Zone (Standard 10 % / 40 %).
+## Regenwahrscheinlichkeit
+
+Statt nur einer Vorhersage nutzt die Integration die **40 Läufe des DWD-ICON-Ensembles** (über Open-Meteo):
+- Sperre, wenn mindestens 70 % der Läufe (einstellbar) in 24 h mindestens die Regensperre-Menge bringen.
+- Sonst wird der **erwartete** Regen angerechnet. Beispiel: 30 % Chance auf 12 mm ergibt 3,6 mm erwarteten
+  Regen; gegossen wird nur der Rest.
+- Ist das Ensemble nicht erreichbar, gilt die normale Vorhersage mit fester Schwelle.
+
+Sensoren: „Regenwahrscheinlichkeit 24 h“ und „Regen erwartet 24 h (Ensemble)“.
+
+## Winter-Assistent
+
+Der Sensor **„Saisonstatus“** hat diese Zustände:
+- **Saison**
+- **Ruhe:** alle Zonen ruhen, aber es ist kein Frost in Sicht
+- **Winterfest machen:** alle Zonen ruhen und in den nächsten 72 h droht Frost (≤ 0 °C)
+- **Winterfest**
+- **Saisonstart vorbereiten:** eine Zone treibt laut Wetter wieder aus
+
+Bei „Winterfest machen“ und „Saisonstart vorbereiten“ erscheint einmalig eine Benachrichtigung in Home Assistant
+mit Checkliste (Leitungen entleeren, Batterien aus den Ventilen, Bananen einpacken …).
+
+Mit dem Service `smarte_bewaesserung.set_winterized` (`winterized: true`) markierst du die Anlage als
+winterfest; dann gibt es keine Gießempfehlungen. Im Frühjahr gibst du sie mit `winterized: false` wieder frei.
+
+## Wochenbericht
+
+Der Sensor **„Wochenbericht“** zeigt die Liter der letzten 7 abgeschlossenen Tage. Seine Attribute enthalten je
+Zone: Liter, Läufe, Verbrauch, wirksamer Regen, gegossene mm, gelernter Faktor und, wenn ein Wasserpreis
+eingestellt ist, die Kosten. Ein fertiger Text steht im Attribut `text`.
+
+Für Benachrichtigungen liefert der Service die Daten als Antwort:
+
+```yaml
+- action: smarte_bewaesserung.weekly_report
+  response_variable: bericht
+- action: notify.mobile_app_pascal_s26
+  data:
+    title: "💧 Bewässerung der Woche"
+    message: "{{ bericht.text }}"
+```
 
 ## Entwicklung
 

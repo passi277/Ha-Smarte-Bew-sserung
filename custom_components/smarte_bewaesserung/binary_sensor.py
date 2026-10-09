@@ -44,7 +44,7 @@ GLOBAL_BINARY: tuple[GlobalBinaryDescription, ...] = (
     GlobalBinaryDescription(
         key="rain_block",
         device_class=BinarySensorDeviceClass.MOISTURE,
-        is_on_fn=lambda s, t: s.raining_now or s.rain_forecast_24h_mm >= t.rain_skip_mm,
+        is_on_fn=lambda s, _t: s.rain_blocked,
     ),
 )
 
