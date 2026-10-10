@@ -88,6 +88,8 @@ from .open_meteo import (
 _LOGGER = logging.getLogger(__name__)
 
 RATE_UNITS = ("mm/h", "in/h", "mm/d")
+# Zustände von Regenmeldern ohne Menge (z. B. Zigbee „Rainwater“: raining / none)
+RAINING_STATES = {"on", "true", "raining", "rain", "rainy", "wet", "detected", "yes"}
 ARCHIVE_DELAY_DAYS = 6
 DURATION_UNITS = {"s": 1 / 60, "min": 1.0, "h": 60.0}
 
@@ -420,7 +422,12 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
             return "binary"
         state = self.hass.states.get(entity)
         unit = state.attributes.get("unit_of_measurement", "") if state else ""
-        return "rate" if unit in RATE_UNITS else "amount"
+        if unit in RATE_UNITS:
+            return "rate"
+        if not unit and state is not None and read_float(self.hass, entity) is None:
+            # Ohne Einheit und nicht numerisch: Regenmelder mit Text-Zustand (regnet / regnet nicht)
+            return "binary"
+        return "amount"
 
     def _rain_reading(self) -> float | None:
         if self._rain_sensor_kind() != "amount":
@@ -744,7 +751,7 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
         kind = self._rain_sensor_kind()
         if kind == "binary":
             state = self.hass.states.get(self.rain_sensor)
-            raining = state is not None and state.state == "on"
+            raining = state is not None and str(state.state).lower() in RAINING_STATES
         elif kind == "rate":
             raining = (read_float(self.hass, self.rain_sensor) or 0.0) > 0
         probability = expected_effective = None

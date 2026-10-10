@@ -36,7 +36,8 @@ Erst ab Home Assistant 2025.4 nutzbar, weil Zonen als Subentries angelegt werden
 
 - **Regensensor** (optional) kann sein:
   - ein Mengenzähler in mm, der dann den Open-Meteo-Regen ersetzt,
-  - ein Intensitätssensor in mm/h oder ein binärer Sensor, die dann nur als Sperre „regnet gerade“ wirken.
+  - ein Intensitätssensor in mm/h, ein binärer Sensor oder ein Regenmelder mit Text-Zustand
+    (z. B. Zigbee „Rainwater“: `raining` / `none`). Diese wirken nur als Sperre „regnet gerade“.
 - **Regensperre**: Ab dieser Regenvorhersage für die nächsten 24 h wird nicht gegossen (Standard 3 mm).
 - **Frostsperre** (4 °C) und **Windsperre** (30 km/h).
 - **Gewicht Bodenfeuchtesensor**: Beim Tagesabschluss werden Modell und Sensor gemischt (0,5 = halb/halb).

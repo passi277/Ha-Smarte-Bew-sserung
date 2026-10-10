@@ -248,6 +248,27 @@ async def test_rain_sensor_replaces_open_meteo(hass: HomeAssistant, mock_fetch, 
     assert float(hass.states.get(_eid(hass, "sensor", "depletion")).state) == pytest.approx(0.7)
 
 
+async def test_rain_detector_with_text_state(hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory) -> None:
+    """Zigbee-Regenmelder ohne Menge (raining / none) wirkt als Sperre „regnet gerade“."""
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    freezer.move_to("2026-07-10 12:00:00+02:00")
+    mock_fetch.return_value = make_weather(dt_util.now().date(), et0=2.0, rain=0.0)
+    hass.states.async_set("sensor.regenmelder", "none")
+    hass.states.async_set(VALVE, "off")
+    entry = _entry({CONF_RAIN_SENSOR: "sensor.regenmelder"})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    rain_block = _eid(hass, "binary_sensor", "rain_block")
+    assert hass.states.get(rain_block).state == "off"
+
+    hass.states.async_set("sensor.regenmelder", "raining")
+    await hass.async_block_till_done()
+    assert hass.states.get(rain_block).state == "on"
+    # Kein Mengenzähler: Regen heute kommt weiter von Open-Meteo
+    assert hass.states.get(_eid(hass, "sensor", "rain_today")).attributes["source"] != "rain_sensor"
+
+
 async def test_unload(hass: HomeAssistant, setup) -> None:
     assert await hass.config_entries.async_unload(setup.entry_id)
     await hass.async_block_till_done()
