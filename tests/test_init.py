@@ -129,6 +129,25 @@ async def test_days_close_and_recommend(hass: HomeAssistant, setup, mock_fetch, 
     assert history[-1]["etc"] == 4.0
 
 
+async def test_excess_irrigation_counts_as_percolation(
+    hass: HomeAssistant, setup, mock_fetch, freezer: FrozenDateTimeFactory
+) -> None:
+    depletion = _eid(hass, "sensor", "depletion")
+    freezer.tick(timedelta(hours=12))
+    await hass.services.async_call(
+        DOMAIN, "set_depletion", {"entity_id": depletion, "depletion_mm": 1.0}, blocking=True
+    )
+    # 340 l auf 120 m² mit Wirkungsgrad 0,75 = 2,125 mm, davon 1,125 mm über Feldkapazität
+    await hass.services.async_call(DOMAIN, "record_irrigation", {"entity_id": depletion, "liters": 340}, blocking=True)
+    assert float(hass.states.get(depletion).state) == 0.0
+    freezer.tick(timedelta(days=1))
+    mock_fetch.return_value = make_weather(dt_util.now().date(), et0=5.0)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    history = hass.states.get(depletion).attributes["history"]
+    assert history[-1]["percolation"] == pytest.approx(1.13, abs=0.01)
+
+
 async def test_rain_forecast_blocks(hass: HomeAssistant, setup, mock_fetch, freezer: FrozenDateTimeFactory) -> None:
     coordinator = setup.runtime_data
     zone = next(iter(coordinator.zones.values()))

@@ -197,6 +197,7 @@ class Zone:
         state.setdefault("throughput_samples", [])
         state.setdefault("history", [])
         state.setdefault("irrigation_mm_by_date", {})
+        state.setdefault("percolation_mm_by_date", {})
         state.setdefault("liters_by_date", {})
         state.setdefault("runs_by_date", {})
         self.calibrator = SoilCalibrator(state.setdefault("soil_calibration", {}))
@@ -588,7 +589,10 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
                         "rain_source": source,
                         "effective_rain": round(result.effective_rain_mm, 2),
                         "irrigation_mm": round(zone.state["irrigation_mm_by_date"].get(day.isoformat(), 0.0), 2),
-                        "percolation": round(result.percolation_mm, 2),
+                        "percolation": round(
+                            result.percolation_mm + zone.state["percolation_mm_by_date"].get(day.isoformat(), 0.0),
+                            2,
+                        ),
                         "soil_moisture": moisture,
                         "depletion": round(zone.depletion, 2),
                     }
@@ -642,7 +646,7 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
             del rain[key]
         for zone in self.zones.values():
             zone.state["history"] = [h for h in zone.state["history"] if h["date"] >= cutoff]
-            for name in ("irrigation_mm_by_date", "liters_by_date", "runs_by_date"):
+            for name in ("irrigation_mm_by_date", "percolation_mm_by_date", "liters_by_date", "runs_by_date"):
                 by_date = zone.state[name]
                 for key in [k for k in by_date if k < cutoff]:
                     del by_date[key]
@@ -672,11 +676,18 @@ class SmarteBewaesserungCoordinator(DataUpdateCoordinator[Snapshot]):
     def record_run(self, zone: Zone, run: RunRecord) -> None:
         """Lauf verbuchen: Wasserkonto, Statistik, Durchsatz."""
         key = dt_util.as_local(run.start).date().isoformat()
+        applied = model.liters_to_mm(zone.params, run.liters)
         if key == dt_util.now().date().isoformat():
             # Gegen den aktuellen Stand rechnen: Wasser über Feldkapazität versickert.
-            self._set_live_depletion(zone, self._live_depletion(zone) - model.liters_to_mm(zone.params, run.liters))
+            before = self._live_depletion(zone)
+            self._set_live_depletion(zone, before - applied)
         else:
+            before = model.clamp_depletion(zone.params, zone.depletion)
             zone.depletion = model.apply_irrigation(zone.params, zone.depletion, run.liters)
+        excess = max(0.0, applied - before)
+        if excess > 0:
+            percolated = zone.state["percolation_mm_by_date"]
+            percolated[key] = round(percolated.get(key, 0.0) + excess, 3)
         by_date = zone.state["irrigation_mm_by_date"]
         by_date[key] = round(by_date.get(key, 0.0) + model.liters_to_mm(zone.params, run.liters), 3)
         zone.state["total_liters"] = round(zone.state["total_liters"] + run.liters, 1)
