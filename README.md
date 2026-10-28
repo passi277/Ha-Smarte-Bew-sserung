@@ -212,9 +212,10 @@ Integration vergleicht dafür die Wassermenge pro Stunde (Durchsatz ÷ Fläche) 
 |---|---|---|---|---|---|---|
 | Versickerung (mm/h) | 25 | 20 | 15 | 12 | 10 | 5 |
 
-Bis etwa 3 mm Wasser darf kurz an der Oberfläche stehen. Liegt die Zone darüber, schlägt die Empfehlung
-Intervalle vor. Die Bananen bekommen mit 20 l/min auf 15 m² rund 80 mm pro Stunde. Ein Lauf von 10 min wird
-deshalb zu **5 × 2 min mit je 15 min Pause**. Der Plan steht im Text der Begründung und in den Attributen
+Bis etwa 3 mm Wasser darf kurz an der Oberfläche stehen. Liegt eine Regner-Zone darüber, schlägt die
+Empfehlung Intervalle vor. Ein Regner mit 20 l/min auf 15 m² bringt rund 80 mm pro Stunde, ein Lauf von 10 min
+wird deshalb zu **5 × 2 min mit je 15 min Pause**. Zonen mit Tropfern oder Auslässen am Stamm (Art „drip“)
+laufen ohne Intervalle, weil das Wasser dort punktuell in den Wurzelbereich fließt. Der Plan steht im Text der Begründung und in den Attributen
 `cycles`, `cycle_on_min` und `cycle_soak_min` des Sensors „Empfohlene Dauer“.
 
 ## Bodenfeuchtesensor: Kalibrierung und Lernen

@@ -9,22 +9,25 @@ from custom_components.smarte_bewaesserung.learning import DemandLearner, SoilCa
 
 BANANAS = model.ZoneParams(area_m2=15, throughput_lpm=20, kc=1.2, root_depth_cm=40, irrigation_type="drip")
 LAWN = model.ZoneParams(area_m2=120, throughput_lpm=17, kc=0.8, root_depth_cm=20)
+BED = model.ZoneParams(area_m2=15, throughput_lpm=20, kc=1.0, root_depth_cm=30)
 HOUR = 3600
 
 
 def test_cycle_plan_for_fast_zone() -> None:
-    # 80 mm/h auf Lehm (12 mm/h): nach gut 2 min stünde Wasser → 2-min-Intervalle, 15 min Pause
-    plan = model.cycle_plan(BANANAS, 10)
+    # Regner mit 80 mm/h auf Lehm (12 mm/h): nach gut 2 min stünde Wasser → 2-min-Intervalle, 15 min Pause
+    plan = model.cycle_plan(BED, 10)
     assert plan == model.CyclePlan(cycles=5, on_min=2, soak_min=15)
     assert plan.describe() == "5 × 2 min, je 15 min Pause"
     # Rasen mit 8,5 mm/h versickert sofort
     assert model.cycle_plan(LAWN, 30) is None
     # Kurzer Lauf passt in ein Intervall
-    assert model.cycle_plan(BANANAS, 2) is None
+    assert model.cycle_plan(BED, 2) is None
+    # Tropfer/Auslass am Stamm: keine Intervalle
+    assert model.cycle_plan(BANANAS, 18) is None
 
 
 def test_recommendation_contains_cycles() -> None:
-    rec = model.recommend(BANANAS, 30.0, model.Conditions(), model.Thresholds())
+    rec = model.recommend(BED, 30.0, model.Conditions(), model.Thresholds())
     assert rec.cycles is not None
     assert "in Intervallen" in rec.reason
 

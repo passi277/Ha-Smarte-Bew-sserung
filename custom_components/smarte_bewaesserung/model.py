@@ -200,7 +200,13 @@ class CyclePlan:
 
 
 def cycle_plan(params: ZoneParams, minutes: int) -> CyclePlan | None:
-    """Intervalle, wenn die Zone schneller wässert, als der Boden aufnimmt."""
+    """Intervalle, wenn die Zone schneller wässert, als der Boden aufnimmt.
+
+    Nur für Regner: Bei Tropfern und Auslässen am Stamm fließt das Wasser punktuell
+    in den Wurzelbereich, die Flächenrechnung würde viel zu kurze Intervalle liefern.
+    """
+    if params.irrigation_type == "drip":
+        return None
     excess_per_min = (params.gross_rate_mm_h - params.infiltration_mm_h) / 60
     if minutes <= 0 or excess_per_min <= 0:
         return None
